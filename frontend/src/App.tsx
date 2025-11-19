@@ -2,20 +2,19 @@ import { useState } from "react";
 import { LoginPage } from "./components/auth/LoginPage";
 import { SignUpPage } from "./components/auth/SignUpPage";
 import { MainLayout } from "./components/layout/MainLayout";
-import { Dashboard } from "./components/dashboard/Dashboard";
 import { ChildMonitoring } from "./components/monitoring/ChildMonitoring";
 import { TrendsCenter } from "./components/trends/TrendsCenter";
 import { AlertsPage } from "./components/alerts/AlertsPage";
 import { SettingsPage } from "./components/settings/SettingsPage";
-import { Toaster } from "./components/ui/sonner";
+import { Toaster } from "sonner"; // Import Toaster
 
 type AuthView = "login" | "signup";
-type AppPage = "dashboard" | "monitoring" | "trends" | "alerts" | "settings";
+type AppPage = "monitoring" | "trends" | "alerts" | "settings";
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authView, setAuthView] = useState<AuthView>("login");
-  const [currentPage, setCurrentPage] = useState<AppPage>("dashboard");
+  const [currentPage, setCurrentPage] = useState<AppPage>("trends");
 
   const handleLogin = () => {
     setIsAuthenticated(true);
@@ -28,7 +27,7 @@ export default function App() {
   const handleLogout = () => {
     setIsAuthenticated(false);
     setAuthView("login");
-    setCurrentPage("dashboard");
+    setCurrentPage("trends");
   };
 
   const handleNavigate = (page: string) => {
@@ -39,41 +38,45 @@ export default function App() {
     setCurrentPage("monitoring");
   };
 
-  // Render auth screens
-  if (!isAuthenticated) {
-    if (authView === "login") {
-      return (
-        <LoginPage
-          onLogin={handleLogin}
-          onNavigateToSignUp={() => setAuthView("signup")}
-        />
-      );
-    } else {
-      return (
-        <SignUpPage
-          onSignUp={handleSignUp}
-          onNavigateToLogin={() => setAuthView("login")}
-        />
-      );
+  // Helper function to render content based on auth state
+  const renderContent = () => {
+    if (!isAuthenticated) {
+      if (authView === "login") {
+        return (
+          <LoginPage
+            onLogin={handleLogin}
+            onNavigateToSignUp={() => setAuthView("signup")}
+          />
+        );
+      } else if (authView === "signup") {
+        return (
+          <SignUpPage
+            onSignUp={handleSignUp}
+            onNavigateToLogin={() => setAuthView("login")}
+          />
+        );
+      }
     }
-  }
 
-  // Render main application
-  return (
-    <>
+    return (
       <MainLayout
         currentPage={currentPage}
         onNavigate={handleNavigate}
         onLogout={handleLogout}
-        unreadAlerts={3}
       >
-        {currentPage === "dashboard" && <Dashboard onViewChild={handleViewChild} />}
         {currentPage === "monitoring" && <ChildMonitoring />}
         {currentPage === "trends" && <TrendsCenter />}
         {currentPage === "alerts" && <AlertsPage />}
         {currentPage === "settings" && <SettingsPage />}
       </MainLayout>
-      <Toaster position="top-right" />
+    );
+  };
+
+  return (
+    <>
+      {renderContent()}
+      {/* Toaster must be OUTSIDE the conditional returns to work globally */}
+      <Toaster position="top-right" richColors={true} />
     </>
   );
 }
