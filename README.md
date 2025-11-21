@@ -82,7 +82,22 @@ This repository contains the **frontend** for the Reddit Monitor application. To
     This will open the app in your browser, usually at `http://localhost:3000`.
 
 **Note:** For full functionality, you will need a backend server running that securely communicates with the Reddit API using OAuth.
+### Running the Backend
 
+1.  **Clone the repository:**
+
+    ```bash
+    git clone https://github.com/anatwork14/reddit_monitor.git
+    cd reddit_monitor
+    ```
+2.  **Install require lib:**
+   ```bash
+   pip install -r requirement.txt
+   ```
+3.  **Run back end:**
+   ```bash
+   python3 -m backend.main
+   ```
 ## Project Roadmap: The Future Vision
 
 This project is just getting started. Here is our vision for the future:
