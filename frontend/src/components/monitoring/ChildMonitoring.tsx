@@ -23,7 +23,8 @@ import {
   Loader2,
   Plus,
   Trash2,
-  UserPlus
+  UserPlus,
+  RefreshCcw 
 } from "lucide-react";
 import {
   Select,
@@ -56,7 +57,6 @@ import { Checkbox } from "../ui/checkbox";
 import { Badge } from "../ui/badge";
 import { toast } from "sonner";
 
-// Interface for Child (Backend)
 interface Child {
   id: number;
   name: string;
@@ -65,20 +65,21 @@ interface Child {
   avatar_url?: string;
 }
 
-// Interface for Interaction (New API)
+// --- 1. SỬA INTERFACE CHO KHỚP VỚI DB ---
 interface Interaction {
   id: string;
   type: "post" | "comment";
   content: string;
   subreddit: string;
-  timestamp: string;
-  score: number;
+  // Database trả về 'created_at', không phải 'timestamp'
+  created_at: string; 
+  score?: number;
   sentiment: string;
-  risk: RiskLevel;
+  // Database trả về 'risk_level', không phải 'risk'
+  risk_level: RiskLevel; 
   url: string;
 }
 
-// Interface for Subreddit Data (PRAW)
 interface SubredditData {
   name: string;
   activityLevel: number;
@@ -90,36 +91,70 @@ interface SubredditData {
 }
 
 export function ChildMonitoring() {
-  // --- STATES ---
   const [childrenList, setChildrenList] = useState<Child[]>([]);
   const [selectedChildId, setSelectedChildId] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
 
-  // Data States
   const [interactionsList, setInteractionsList] = useState<Interaction[]>([]);
   const [subredditsList, setSubredditsList] = useState<SubredditData[]>([]);
   
-  // Loading States for separate sections
   const [isFetchingInteractions, setIsFetchingInteractions] = useState(false);
   const [isFetchingSubreddits, setIsFetchingSubreddits] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
 
-  // Add Child Form States
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newChildName, setNewChildName] = useState("");
   const [newChildAge, setNewChildAge] = useState("");
   const [newChildUsername, setNewChildUsername] = useState("");
   const [isAdding, setIsAdding] = useState(false);
 
-  // Filter States
   const [searchValue, setSearchValue] = useState("");
   const [riskFilter, setRiskFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("7days");
   const [subredditFilter, setSubredditFilter] = useState("all");
   const [anonymizeReport, setAnonymizeReport] = useState(false);
 
-  // --- FUNCTIONS ---
+  // --- 2. HÀM FORMAT THỜI GIAN ---
+  const formatTimeAgo = (dateString: string) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+    
+    if (diffInSeconds < 60) return "Just now";
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+    return `${Math.floor(diffInSeconds / 86400)}d ago`;
+  };
 
-  // 1. Fetch Child List
+  const handleScan = async () => {
+    if (!selectedChildId) return;
+    setIsScanning(true);
+    toast.info("Sending scan request...");
+
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`http://localhost:8000/api/children/${selectedChildId}/scan`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        toast.success("Scanning in background. Data will appear shortly!");
+        setTimeout(() => {
+            fetchInteractions();
+            setIsScanning(false);
+        }, 3000);
+      } else {
+        toast.error("Error sending scan request.");
+        setIsScanning(false);
+      }
+    } catch (e) {
+      toast.error("Server connection error.");
+      setIsScanning(false);
+    }
+  };
+
   const fetchChildren = async () => {
     setIsLoading(true);
     try {
@@ -137,7 +172,6 @@ export function ChildMonitoring() {
         const data = await response.json();
         setChildrenList(data);
         
-        // Default selection logic
         if (data.length > 0) {
             const currentExists = data.find((c: Child) => c.id.toString() === selectedChildId);
             if (!selectedChildId || !currentExists) {
@@ -156,7 +190,6 @@ export function ChildMonitoring() {
     }
   };
 
-  // 2. Fetch Interactions (Posts/Comments)
   const fetchInteractions = async () => {
     if (!selectedChildId) return;
     setIsFetchingInteractions(true);
@@ -178,7 +211,6 @@ export function ChildMonitoring() {
     }
   };
 
-  // 3. Fetch Reddit Data (Subreddits via PRAW)
   const fetchSubreddits = async () => {
     if (!selectedChildId) return;
     
@@ -202,7 +234,6 @@ export function ChildMonitoring() {
     }
   };
 
-  // 4. Add New Child
   const handleAddChild = async () => {
     if (!newChildName || !newChildUsername) {
         toast.error("Please enter a name and Reddit username.");
@@ -221,7 +252,7 @@ export function ChildMonitoring() {
             body: JSON.stringify({
                 name: newChildName,
                 age: parseInt(newChildAge) || 0,
-                reddit_username: newChildUsername.replace("u/", "") // Strip u/ if present
+                reddit_username: newChildUsername.replace("u/", "")
             })
         });
 
@@ -231,7 +262,7 @@ export function ChildMonitoring() {
             setNewChildName("");
             setNewChildAge("");
             setNewChildUsername("");
-            fetchChildren(); // Reload list
+            fetchChildren();
         } else {
             const err = await response.json();
             toast.error(err.detail || "Failed to add account.");
@@ -243,7 +274,6 @@ export function ChildMonitoring() {
     }
   };
 
-  // 5. Delete Child
   const handleDeleteChild = async () => {
     if (!selectedChildId) return;
 
@@ -256,7 +286,7 @@ export function ChildMonitoring() {
 
         if (response.ok) {
             toast.success("Account deleted successfully.");
-            fetchChildren(); // Reload list
+            fetchChildren(); 
         } else {
             toast.error("Failed to delete account.");
         }
@@ -265,14 +295,10 @@ export function ChildMonitoring() {
     }
   };
 
-  // --- EFFECTS ---
-
-  // Initial fetch
   useEffect(() => {
     fetchChildren();
   }, []);
 
-  // Fetch data when selected child changes
   useEffect(() => {
     fetchInteractions();
     fetchSubreddits();
@@ -280,7 +306,6 @@ export function ChildMonitoring() {
 
   const currentChild = childrenList.find(c => c.id.toString() === selectedChildId);
 
-  // --- UI LOADING ---
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-[50vh] gap-4">
@@ -290,7 +315,6 @@ export function ChildMonitoring() {
     );
   }
 
-  // --- UI EMPTY (NO CHILDREN) ---
   if (!isLoading && childrenList.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-6 animate-in fade-in zoom-in duration-300">
@@ -344,7 +368,6 @@ export function ChildMonitoring() {
     );
   }
 
-  // --- MAIN UI ---
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       {/* Header & Controls */}
@@ -367,7 +390,6 @@ export function ChildMonitoring() {
           </Avatar>
           
           <div className="flex items-center gap-2">
-            {/* Child Dropdown */}
             <Select value={selectedChildId} onValueChange={setSelectedChildId}>
                 <SelectTrigger className="w-[180px] h-8 border-none shadow-none bg-transparent focus:ring-0">
                     <SelectValue placeholder="Select account" />
@@ -381,7 +403,16 @@ export function ChildMonitoring() {
                 </SelectContent>
             </Select>
 
-            {/* Add Button */}
+            <Button 
+                onClick={handleScan} 
+                disabled={isScanning}
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
+            >
+                <RefreshCcw className={`h-4 w-4 ${isScanning ? 'animate-spin' : ''}`} />
+                {isScanning ? "Scanning..." : "Refresh Data"}
+            </Button>
+
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
                 <DialogTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary"><Plus className="h-5 w-5" /></Button>
@@ -417,7 +448,6 @@ export function ChildMonitoring() {
                 </DialogContent>
             </Dialog>
 
-            {/* Delete Button */}
             <AlertDialog>
                 <AlertDialogTrigger asChild>
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-600"><Trash2 className="h-4 w-4" /></Button>
@@ -439,7 +469,6 @@ export function ChildMonitoring() {
         </div>
       </div>
 
-      {/* Tabs Content */}
       <Tabs defaultValue="interactions" className="space-y-6">
         <TabsList className="grid w-full grid-cols-3 h-12 p-1 bg-muted/50 rounded-xl">
           <TabsTrigger value="interactions" className="rounded-lg">Interactions</TabsTrigger>
@@ -476,9 +505,11 @@ export function ChildMonitoring() {
                                         {interaction.type === 'post' ? "Post" : "Comment"}
                                     </Badge>
                                     <span>in <span className="font-semibold text-foreground">{interaction.subreddit}</span></span>
-                                    <span>• {interaction.timestamp}</span>
+                                    {/* Dùng hàm format thời gian mới */}
+                                    <span>• {formatTimeAgo(interaction.created_at)}</span>
                                 </div>
-                                <RiskIndicator level={interaction.risk} showIcon={true} />
+                                {/* Dùng đúng tên trường risk_level */}
+                                <RiskIndicator level={interaction.risk_level} showIcon={true} />
                             </div>
                             <p className="text-base text-foreground/90 pl-1 border-l-2 border-muted">
                                 "{interaction.content}"
@@ -528,7 +559,6 @@ export function ChildMonitoring() {
             )}
         </TabsContent>
 
-        {/* --- TAB 3: REPORTS --- */}
         <TabsContent value="reports" className="space-y-6 mt-0">
             <Card className="shadow-sm">
                 <CardHeader><CardTitle>Export Report</CardTitle></CardHeader>

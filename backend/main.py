@@ -10,6 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 # Import các thành phần từ cấu trúc thư mục mới
 from backend.db.session import engine, SessionLocal
 from backend.models.user import User
+from backend.db.session import engine, Base
+from backend.models.interaction import Interaction
 # from backend.db.models import Base  
 
 # # Hàm tạo bảng tự động
@@ -32,6 +34,7 @@ from backend.routers import children  # Import children router
 app = FastAPI()
 
 # Add OAuth2PasswordBearer to enable Authorize button in docs
+Base.metadata.create_all(bind=engine)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 # Custom OpenAPI schema to show Bearer Auth in Swagger UI
