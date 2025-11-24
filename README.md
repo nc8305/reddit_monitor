@@ -58,6 +58,7 @@ This repository contains both the frontend and backend code. Follow these steps 
 ```bash
 git clone [https://github.com/nc8305/Reddit-Analysis-Tool.git](https://github.com/nc8305/Reddit-Analysis-Tool.git)
 cd Reddit-Analysis-Tool
+```
 
 2. **Start Infrastructure (Kafka & Database)** 
 
@@ -67,7 +68,7 @@ cd Reddit-Analysis-Tool
 
  # Verify services are running (Look for 'kafka' and 'zookeeper' with status 'Up')
  sudo docker ps
-
+```
 3. **Setting up backend**
 
  ```bash
@@ -77,7 +78,7 @@ source .venv/bin/activate
 
 # Install required libraries
 pip install -r backend/requirement.txt
-
+```
 4. **Setting up the Frontend**
 Open a new terminal window and navigate to the frontend directory.
 ```bash
@@ -86,7 +87,7 @@ cd frontend
 npm install
 # Run the development server
 npm run dev
-
+```
 ## Project Roadmap: The Future Vision
 
 This project is just getting started. Here is our vision for the future:
