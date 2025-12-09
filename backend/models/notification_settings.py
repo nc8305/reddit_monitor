@@ -21,6 +21,6 @@ class NotificationSettings(Base):
     # Frequency: "instant", "daily", "weekly"
     frequency = Column(String, default="instant")
     
-    # Relationship
-    user = relationship("User", backref="notification_settings")
+    # Relationship - sử dụng back_populates thay vì backref
+    user = relationship("User", back_populates="notification_settings")
 

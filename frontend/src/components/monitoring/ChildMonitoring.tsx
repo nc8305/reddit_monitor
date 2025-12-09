@@ -250,10 +250,11 @@ export function ChildMonitoring() {
     }
   };
 
+  // Handle manual scan trigger (optional - user có thể trigger scan ngay lập tức)
   const handleScan = async () => {
     if (!selectedChildId) return;
     setIsScanning(true);
-    toast.info("Sending scan request...");
+    toast.info("Đang gửi yêu cầu scan...");
 
     try {
       const token = localStorage.getItem("token");
@@ -268,38 +269,22 @@ export function ChildMonitoring() {
       );
 
       if (res.ok) {
-        toast.success("Scan request sent. Data will appear shortly!");
+        toast.success("Yêu cầu scan đã được gửi! Dữ liệu mới sẽ xuất hiện tự động...");
+        setIsScanning(false);
         
-        // Polling để lấy data mới sau khi scan
-        // Kiểm tra selectedChildId vẫn giống để tránh cộng dồn data
-        const checkAndFetch = (delay: number) => {
-          setTimeout(() => {
-            // Chỉ fetch nếu vẫn đang ở cùng child
-            if (selectedChildId === currentChildId) {
-              fetchInteractions();
-            }
-          }, delay);
-        };
-
-        checkAndFetch(3000);
-        checkAndFetch(5000);
+        // Auto-polling sẽ tự động fetch data sau 5 giây
+        // Không cần manual polling nữa vì đã có auto-polling
         setTimeout(() => {
-          // Kiểm tra lần cuối trước khi complete
           if (selectedChildId === currentChildId) {
             fetchInteractions();
-            setIsScanning(false);
-            const scanTime = new Date().toLocaleTimeString();
-            toast.success(`Data refresh complete at ${scanTime}!`);
-          } else {
-            setIsScanning(false);
           }
-        }, 10000); 
+        }, 5000);
       } else {
-        toast.error("Error sending scan request.");
+        toast.error("Lỗi khi gửi yêu cầu scan.");
         setIsScanning(false);
       }
     } catch (e) {
-      toast.error("Server connection error.");
+      toast.error("Lỗi kết nối server.");
       setIsScanning(false);
     }
   };
@@ -435,6 +420,25 @@ export function ChildMonitoring() {
     }
     fetchSubreddits();
   }, [selectedChildId, riskFilter, sentimentFilter, subredditFilter, searchValue, dateFilter]);
+
+  // Auto-polling: Tự động fetch data mới từ DB mỗi 30 giây
+  // Kafka worker đang xử lý streaming, frontend chỉ cần pull data mới từ DB
+  // Note: fetchInteractions được định nghĩa trong component nên có thể dùng trực tiếp
+  useEffect(() => {
+    if (!selectedChildId) return;
+    
+    // Polling interval: 30 giây - tự động cập nhật data mới từ DB
+    const pollingInterval = setInterval(() => {
+      // Chỉ fetch khi không đang stream và không đang scan
+      if (!isStreaming && !isScanning) {
+        fetchInteractions();
+      }
+    }, 30000); // 30 giây
+
+    return () => clearInterval(pollingInterval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedChildId, isStreaming, isScanning]);
+  // Note: fetchInteractions không cần trong deps vì nó được định nghĩa trong cùng component
 
   const currentChild = childrenList.find(
     (c) => c.id.toString() === selectedChildId
@@ -606,15 +610,16 @@ export function ChildMonitoring() {
               disabled={isScanning || isStreaming}
               size="sm"
               className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
+              title="Kafka đang xử lý streaming tự động. Nút này chỉ để trigger scan ngay lập tức."
             >
               <RefreshCcw
                 className={`h-4 w-4 ${isScanning ? "animate-spin" : ""}`}
               />
               {isScanning
-                ? "Scanning..."
+                ? "Đang scan..."
                 : isStreaming
-                ? "Streaming..."
-                : "Refresh"}
+                ? "Đang stream..."
+                : "Scan ngay"}
             </Button>
 
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>

@@ -7,8 +7,20 @@ class ENV:
     DB_USER = os.getenv("user")
     DB_PASSWORD = os.getenv("password")
     DB_HOST = os.getenv("host")
-    DB_PORT = os.getenv("port")
+    DB_PORT = os.getenv("port", "5432")  # Default port nếu không có
     DB_NAME = os.getenv("dbname")
+    
+    # Validate các biến bắt buộc
+    if not all([DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME]):
+        missing = [k for k, v in {
+            "user": DB_USER, 
+            "password": DB_PASSWORD, 
+            "host": DB_HOST, 
+            "port": DB_PORT, 
+            "dbname": DB_NAME
+        }.items() if not v]
+        raise ValueError(f"Missing required environment variables: {', '.join(missing)}")
+    
     DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
     REDDIT_CLIENT_ID = os.getenv("REDDIT_CLIENT_ID")
     REDDIT_CLIENT_SECRET = os.getenv("REDDIT_CLIENT_SECRET")

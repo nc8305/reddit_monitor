@@ -16,6 +16,7 @@ from backend.models.interaction import Interaction
 from backend.models.child import Child
 from backend.models.user import User
 from backend.models.alert import Alert  # Import Alert
+from backend.models.notification_settings import NotificationSettings  # Import để SQLAlchemy resolve relationship
 
 
 try:

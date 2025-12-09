@@ -6,6 +6,7 @@ from typing import Any, Union
 SECRET_KEY = "chuoi_bi_mat_sieu_kho_doan_cua_ban"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
+REFRESH_TOKEN_EXPIRE_DAYS = 7  # Định nghĩa REFRESH_TOKEN_EXPIRE_DAYS
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 

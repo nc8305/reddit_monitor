@@ -16,10 +16,9 @@ from backend.models.notification_settings import NotificationSettings
 # 2. Import Routers (File xử lý API)
 from backend.routers import auth
 from backend.routers import children
-from backend.routers import alerts  # <--- Import file routers/alerts.py
-from backend.routers import trends  # <--- Import file routers/trends.py
-from backend.routers import settings  # <--- Import file routers/settings.py
-
+from backend.routers import alerts  
+from backend.routers import trends 
+from backend.routers import settings  
 # 3. Tạo bảng tự động
 Base.metadata.create_all(bind=engine)
 

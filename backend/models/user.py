@@ -15,3 +15,6 @@ class User(Base):
     # Quan hệ Many-to-Many với Child
     # secondary=parent_child_link: Dùng biến đã import ở trên
     children = relationship("Child", secondary=parent_child_link, back_populates="parents")
+    
+    # Quan hệ One-to-One với NotificationSettings
+    notification_settings = relationship("NotificationSettings", back_populates="user", uselist=False)

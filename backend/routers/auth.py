@@ -1,20 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from backend.db.session import SessionLocal
 from backend.models.user import User
 from backend.schemas.auth import UserCreate, UserLogin, Token
-from backend.dependencies import get_current_user
+from backend.dependencies import get_db
 from backend.services.security import get_password_hash, verify_password, create_access_token
 
 router = APIRouter()
-
-# Dependency lấy kết nối DB
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 # --- API ĐĂNG KÝ (QUAN TRỌNG) ---
 @router.post("/register")
