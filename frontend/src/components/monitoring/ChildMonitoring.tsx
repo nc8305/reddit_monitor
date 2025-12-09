@@ -25,7 +25,6 @@ import {
   Plus,
   Trash2,
   UserPlus,
-  RefreshCcw,
   Clock,
   ChevronDown,
 } from "lucide-react";
@@ -106,7 +105,6 @@ export function ChildMonitoring() {
   // Loading status
   const [isFetchingInteractions, setIsFetchingInteractions] = useState(false);
   const [isFetchingSubreddits, setIsFetchingSubreddits] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false); 
 
   // Dialogs
@@ -251,44 +249,6 @@ export function ChildMonitoring() {
   };
 
   // Handle manual scan trigger (optional - user có thể trigger scan ngay lập tức)
-  const handleScan = async () => {
-    if (!selectedChildId) return;
-    setIsScanning(true);
-    toast.info("Đang gửi yêu cầu scan...");
-
-    try {
-      const token = localStorage.getItem("token");
-      const currentChildId = selectedChildId; // Lưu lại child_id hiện tại
-      
-      const res = await fetch(
-        `http://localhost:8000/api/children/${selectedChildId}/scan`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      if (res.ok) {
-        toast.success("Yêu cầu scan đã được gửi! Dữ liệu mới sẽ xuất hiện tự động...");
-        setIsScanning(false);
-        
-        // Auto-polling sẽ tự động fetch data sau 5 giây
-        // Không cần manual polling nữa vì đã có auto-polling
-        setTimeout(() => {
-          if (selectedChildId === currentChildId) {
-            fetchInteractions();
-          }
-        }, 5000);
-      } else {
-        toast.error("Lỗi khi gửi yêu cầu scan.");
-        setIsScanning(false);
-      }
-    } catch (e) {
-      toast.error("Lỗi kết nối server.");
-      setIsScanning(false);
-    }
-  };
-
   const handleAddChild = async () => {
     if (!newChildName || !newChildUsername) {
       toast.error("Please enter a display name and Reddit username.");
@@ -421,23 +381,22 @@ export function ChildMonitoring() {
     fetchSubreddits();
   }, [selectedChildId, riskFilter, sentimentFilter, subredditFilter, searchValue, dateFilter]);
 
-  // Auto-polling: Tự động fetch data mới từ DB mỗi 30 giây
-  // Kafka worker đang xử lý streaming, frontend chỉ cần pull data mới từ DB
-  // Note: fetchInteractions được định nghĩa trong component nên có thể dùng trực tiếp
+  // Auto-polling: Tự động fetch data mới từ DB mỗi 2 giây
   useEffect(() => {
     if (!selectedChildId) return;
     
-    // Polling interval: 30 giây - tự động cập nhật data mới từ DB
+    // Polling interval: 2 giây - tự động cập nhật data mới từ DB
     const pollingInterval = setInterval(() => {
-      // Chỉ fetch khi không đang stream và không đang scan
-      if (!isStreaming && !isScanning) {
+      // Chỉ fetch khi không đang stream
+      if (!isStreaming) {
         fetchInteractions();
+        fetchSubreddits();
       }
-    }, 30000); // 30 giây
+    }, 2000); // 2 giây
 
     return () => clearInterval(pollingInterval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedChildId, isStreaming, isScanning]);
+  }, [selectedChildId, isStreaming]);
   // Note: fetchInteractions không cần trong deps vì nó được định nghĩa trong cùng component
 
   const currentChild = childrenList.find(
@@ -604,23 +563,6 @@ export function ChildMonitoring() {
                 ))}
               </SelectContent>
             </Select>
-
-            <Button
-              onClick={handleScan}
-              disabled={isScanning || isStreaming}
-              size="sm"
-              className="bg-blue-600 hover:bg-blue-700 text-white gap-2"
-              title="Kafka đang xử lý streaming tự động. Nút này chỉ để trigger scan ngay lập tức."
-            >
-              <RefreshCcw
-                className={`h-4 w-4 ${isScanning ? "animate-spin" : ""}`}
-              />
-              {isScanning
-                ? "Đang scan..."
-                : isStreaming
-                ? "Đang stream..."
-                : "Scan ngay"}
-            </Button>
 
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogTrigger asChild>

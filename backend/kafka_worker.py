@@ -221,17 +221,24 @@ def run_worker():
                                 # Fallback mode - không dùng AI
                                 ai_risk, ai_category, ai_summary = analyze_content(item['content'], verbose=False)
                             
+                            # Lấy risk từ rules-based detection (PRAW) - đã được cải thiện với keywords
                             praw_risk = item.get('risk', 'low')
+                            praw_sentiment = item.get('sentiment', 'Neutral')
                             
-                            # Xác định risk level cuối cùng (kết hợp AI và PRAW)
+                            # Ưu tiên risk cao hơn: nếu một trong hai (AI hoặc PRAW) là high -> high
+                            # Nếu cả hai đều không high nhưng một là medium -> medium
                             final_risk = "low"
-                            if ai_risk == "high" or praw_risk == "high":
+                            if praw_risk == "high" or ai_risk == "high":
                                 final_risk = "high"
-                            elif praw_risk == "medium":
+                            elif praw_risk == "medium" or ai_risk == "medium":
                                 final_risk = "medium"
                             
+                            # Sử dụng sentiment từ PRAW (đã được cải thiện với keywords)
+                            final_sentiment = praw_sentiment
+                            
                             if AI_MODELS_AVAILABLE:
-                                print(f"         Final Risk: {final_risk} (AI: {ai_risk}, PRAW: {praw_risk})")
+                                print(f"         Final Risk: {final_risk} (PRAW: {praw_risk}, AI: {ai_risk})")
+                                print(f"         Final Sentiment: {final_sentiment}")
 
                             # --- LƯU INTERACTION ---
                             new_inter = Interaction(
@@ -240,7 +247,7 @@ def run_worker():
                                 type=item['type'],
                                 content=item['content'],
                                 subreddit=item['subreddit'],
-                                sentiment=item['sentiment'],
+                                sentiment=final_sentiment,  # Sử dụng sentiment đã được xử lý
                                 url=item['url'],
                                 risk_level=final_risk,
                                 category=ai_category,
