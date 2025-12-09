@@ -1,10 +1,12 @@
 import praw
 import time
+import re  # <--- ĐÃ THÊM: Import re để xử lý text
 from collections import Counter
 from backend.config.env_settings import env_settings
 import socket
 import requests.packages.urllib3.util.connection as urllib3_cn
 import requests
+
 # --- 1. FIX LỖI TREO MẠNG (IPv6) ---
 def allowed_gai_family():
     return socket.AF_INET
@@ -19,8 +21,8 @@ reddit = praw.Reddit(
     client_secret=env_settings.REDDIT_CLIENT_SECRET,
     user_agent=env_settings.REDDIT_USER_AGENT,
     requestor_kwargs={
-        'session': session,  # Dùng session có cơ chế retry
-        'timeout': 60        # Tăng timeout lên 60 giây
+        'session': session,
+        'timeout': 10        # <--- QUAN TRỌNG: Giảm từ 60s xuống 10s để tránh treo Worker
     }
 )
 
@@ -34,10 +36,8 @@ def get_relative_time(created_utc):
     if diff < 86400: return f"{diff // 3600}h ago"
     return f"{diff // 86400}d ago"
 
-
-
-# Tự động thử lại 3 lần nếu lỗi mạng (status 500, 502, 504...)
-adapter = requests.adapters.HTTPAdapter(max_retries=3) 
+# Tự động thử lại 2 lần (Giảm từ 3 xuống 2)
+adapter = requests.adapters.HTTPAdapter(max_retries=2) 
 session.mount('https://', adapter)
 session.mount('http://', adapter)
 
@@ -45,14 +45,6 @@ session.mount('http://', adapter)
 def get_user_interactions(username: str, limit: int = None, since_timestamp: float = None):
     """
     Lấy danh sách hoạt động (Post + Comment) của user.
-    
-    Args:
-        username: Reddit username
-        limit: Số lượng items tối đa (None = lấy tất cả có thể)
-        since_timestamp: Chỉ lấy items mới hơn timestamp này (Unix timestamp)
-    
-    Returns:
-        List of interaction dicts, sorted by created_utc (newest first)
     """
     try:
         if not username:
@@ -62,56 +54,52 @@ def get_user_interactions(username: str, limit: int = None, since_timestamp: flo
         user = reddit.redditor(username)
         activities = []
 
-        comment_limit = limit if limit else 100
-        post_limit = limit if limit else 100
+        # Giới hạn tối đa 10 item mỗi loại để tránh quá tải
+        SAFE_LIMIT = 10
+        comment_limit = min(limit, SAFE_LIMIT) if limit else SAFE_LIMIT
+        post_limit = min(limit, SAFE_LIMIT) if limit else SAFE_LIMIT
 
         # 1. Lấy Comments
         try:
             for comment in user.comments.new(limit=comment_limit):
-                # Nếu có since_timestamp, skip items cũ hơn
                 if since_timestamp and comment.created_utc <= since_timestamp:
                     break
                 risk_level = "low"
                 sentiment = "Neutral"
                 
-                # Normalize text: lowercase, loại bỏ dấu câu thừa
+                # Normalize text
+                if not comment.body: continue
                 text_lower = comment.body.lower()
                 text_normalized = re.sub(r'\s+', ' ', text_lower)
                 
-                # Keywords nguy hiểm - HIGH RISK
-                # Sắp xếp từ cụ thể nhất đến chung nhất
+                # Keywords nguy hiểm (theo thứ tự từ cụ thể đến chung)
+                # Lưu ý: "kill" đơn lẻ không được thêm vào để tránh false positives
                 high_risk_keywords = [
                     "kill all of them", "kill all them", "kill all of", "kill all",
-                    "kill some stupid", "kill some people", "kill some",
+                    "kill some stupid people", "kill some stupid", "kill some people", "kill some",
                     "kill stupid people", "kill people",
                     "kill them", "kill myself", "kill yourself", "kill you",
                     "want to kill", "going to kill", "want to die", "going to die", 
                     "hurt myself", "hurt you", "want to hurt",
-                    "violence", "attack", "murder",
-                    "kill"  # "kill" để cuối
+                    "violence", "attack", "murder", "suicide", "self harm"
                 ]
-                # Keywords tiêu cực - MEDIUM RISK
-                medium_risk_keywords = ["hate", "die", "stupid", "idiot", "moron", "sick of", 
-                                       "can't stand", "annoying", "terrible", "awful"]
+                medium_risk_keywords = [
+                    "hate", "die", "stupid", "idiot", "moron", "sick of", 
+                    "can't stand", "annoying", "terrible", "awful", "depressed",
+                    "hopeless", "worthless", "useless"
+                ]
                 
                 if any(keyword in text_normalized for keyword in high_risk_keywords):
                     risk_level = "high"
                     sentiment = "Negative"
-                    print(f"      -> HIGH RISK detected in comment: keyword matched")
                 elif any(keyword in text_normalized for keyword in medium_risk_keywords):
                     risk_level = "medium"
                     sentiment = "Negative"
-                    print(f"      -> MEDIUM RISK detected in comment: keyword matched")
-                
-                # Lưu full content để AI phân tích (không truncate)
-                full_content = comment.body
-                # Content để hiển thị (có thể truncate)
-                display_content = comment.body[:300] + ("..." if len(comment.body) > 300 else "")
                 
                 activities.append({
                     "id": comment.id,
                     "type": "comment",
-                    "content": full_content,  # Lưu full content cho AI phân tích
+                    "content": comment.body,
                     "subreddit": f"r/{comment.subreddit.display_name}",
                     "timestamp": get_relative_time(comment.created_utc),
                     "created_utc": comment.created_utc,
@@ -121,34 +109,30 @@ def get_user_interactions(username: str, limit: int = None, since_timestamp: flo
                     "url": f"https://reddit.com{comment.permalink}"
                 })
         except Exception as e:
-            print(f"--> LỖI LẤY COMMENT ({username}): {e}")
+            print(f"--> [WARN] Lỗi lấy comment ({username}): {e}")
 
         # 2. Lấy Posts
         try:
             for post in user.submissions.new(limit=post_limit):
-                # Nếu có since_timestamp, skip items cũ hơn
                 if since_timestamp and post.created_utc <= since_timestamp:
                     break
                 risk_level = "low"
                 sentiment = "Neutral"
                 
-                # Tạo content đầy đủ để phân tích (title + selftext) - KHÔNG truncate
                 full_content = post.title
                 if post.selftext:
                     full_content += " " + post.selftext
                 
-                # Normalize text: lowercase, loại bỏ dấu câu thừa để keyword matching tốt hơn
+                if not full_content: continue
                 text_lower = full_content.lower()
-                # Thay thế nhiều khoảng trắng bằng 1 khoảng trắng
                 text_normalized = re.sub(r'\s+', ' ', text_lower)
                 
-                # Check NSFW
                 if post.over_18:
                     risk_level = "high"
                     sentiment = "NSFW"
                 else:
-                    # Keywords nguy hiểm - HIGH RISK
-                    # Sắp xếp từ cụ thể nhất đến chung nhất
+                    # Keywords nguy hiểm (theo thứ tự từ cụ thể đến chung)
+                    # Lưu ý: "kill" đơn lẻ không được thêm vào để tránh false positives
                     high_risk_keywords = [
                         "kill all of them", "kill all them", "kill all of", "kill all",
                         "kill some stupid", "kill some people", "kill some",
@@ -156,27 +140,25 @@ def get_user_interactions(username: str, limit: int = None, since_timestamp: flo
                         "kill them", "kill myself", "kill yourself", "kill you",
                         "want to kill", "going to kill", "want to die", "going to die", 
                         "hurt myself", "hurt you", "want to hurt",
-                        "violence", "attack", "murder",
-                        "kill"  # "kill" để cuối
+                        "violence", "attack", "murder", "suicide", "self harm"
                     ]
-                    # Keywords tiêu cực - MEDIUM RISK  
-                    medium_risk_keywords = ["hate", "die", "stupid", "idiot", "moron", "sick of",
-                                           "can't stand", "annoying", "terrible", "awful"]
+                    medium_risk_keywords = [
+                        "hate", "die", "stupid", "idiot", "moron", "sick of",
+                        "can't stand", "annoying", "terrible", "awful", "depressed",
+                        "hopeless", "worthless", "useless"
+                    ]
                     
-                    # Kiểm tra keywords trong normalized text
                     if any(keyword in text_normalized for keyword in high_risk_keywords):
                         risk_level = "high"
                         sentiment = "Negative"
-                        print(f"      -> HIGH RISK detected in post: keyword matched")
                     elif any(keyword in text_normalized for keyword in medium_risk_keywords):
                         risk_level = "medium"
                         sentiment = "Negative"
-                        print(f"      -> MEDIUM RISK detected in post: keyword matched")
 
                 activities.append({
                     "id": post.id,
                     "type": "post",
-                    "content": full_content,  # Lưu full content cho AI phân tích (không truncate)
+                    "content": full_content,
                     "subreddit": f"r/{post.subreddit.display_name}",
                     "timestamp": get_relative_time(post.created_utc),
                     "created_utc": post.created_utc,
@@ -186,66 +168,63 @@ def get_user_interactions(username: str, limit: int = None, since_timestamp: flo
                     "url": f"https://reddit.com{post.permalink}"
                 })
         except Exception as e:
-            print(f"--> LỖI LẤY POST ({username}): {e}")
+            print(f"--> [WARN] Lỗi lấy post ({username}): {e}")
 
-        # 3. Sắp xếp
+        # Sắp xếp theo thời gian mới nhất trước
         activities.sort(key=lambda x: x['created_utc'], reverse=True)
         
-        return activities
+        # Loại bỏ trùng lặp dựa trên ID (nếu có)
+        seen_ids = set()
+        unique_activities = []
+        for activity in activities:
+            if activity['id'] not in seen_ids:
+                seen_ids.add(activity['id'])
+                unique_activities.append(activity)
+        
+        return unique_activities
 
     except Exception as e:
-        print(f"--> LỖI CHUNG SERVICE: {e}")
+        print(f"--> [ERROR] Lỗi chung Service: {e}")
         return []
 
 def get_user_top_subreddits(username: str):
     """
-    Lấy danh sách Top Subreddits từ:
-    1. Comments của user
-    2. Posts của user
-    3. Subscribed subreddits (nếu có thể)
+    Lấy danh sách Top Subreddits.
+    Đã tối ưu: Giảm số lượng request để tránh timeout.
     """
     try:
         if not username: return []
         user = reddit.redditor(username)
         subreddit_counts = Counter()
         
+        # --- CẤU HÌNH QUÉT NHANH ---
+        # Chỉ quét 30 items mỗi loại thay vì 100
+        SCAN_LIMIT = 30 
+        
         # 1. Lấy từ Comments
         try:
-            print(f"--> Đang lấy subreddits từ comments của {username}...")
-            for comment in user.comments.new(limit=100):  # Limit để tránh quá lâu
+            # print(f"--> Đang lấy subreddits từ comments...") 
+            # (Comment out print để đỡ rác log)
+            for comment in user.comments.new(limit=SCAN_LIMIT):
                 subreddit_counts[comment.subreddit.display_name] += 1
-        except Exception as e:
-            print(f"--> Lỗi lấy comments: {e}")
+        except Exception:
+            pass # Fail silently để không chặn luồng
         
         # 2. Lấy từ Posts
         try:
-            print(f"--> Đang lấy subreddits từ posts của {username}...")
-            for post in user.submissions.new(limit=100):  # Limit để tránh quá lâu
+            # print(f"--> Đang lấy subreddits từ posts...")
+            for post in user.submissions.new(limit=SCAN_LIMIT):
                 subreddit_counts[post.subreddit.display_name] += 1
-        except Exception as e:
-            print(f"--> Lỗi lấy posts: {e}")
-        
-        # 3. Thử lấy từ Subscribed Subreddits (nếu user là chính mình và authenticated)
-        # Note: Reddit API không cho phép lấy subscribed subreddits của user khác
-        # Chỉ có thể lấy nếu authenticated với chính user đó
-        try:
-            # Kiểm tra xem có thể lấy subscribed không (chỉ hoạt động nếu authenticated)
-            if hasattr(user, 'subreddit') and hasattr(user.subreddit, 'subscribed'):
-                print(f"--> Đang lấy subscribed subreddits...")
-                for sub in user.subreddit.subscribed(limit=50):
-                    subreddit_counts[sub.display_name] += 1
-        except Exception as e:
-            # Không thể lấy subscribed (bình thường nếu không authenticated)
+        except Exception:
             pass
-
+        
+        # 3. Subscribed (Thường không lấy được user khác, bỏ qua nhanh)
+        
         if not subreddit_counts:
-            print(f"--> Không tìm thấy subreddit nào từ {username}")
             return []
 
-        # Lấy Top 10 frequent nhất
+        # Lấy Top 10
         top_subreddits = subreddit_counts.most_common(10) 
-        
-        print(f"--> Tìm thấy {len(top_subreddits)} subreddits")
         
         results = []
         for sub_name, count in top_subreddits:
@@ -253,13 +232,16 @@ def get_user_top_subreddits(username: str):
             risk_score = 2
             rationale = "Cộng đồng phổ biến."
             try:
+                # Lấy info subreddit có thể timeout, cần bọc try/except kỹ
                 sub_info = reddit.subreddit(sub_name)
+                # Truy cập thuộc tính lazy, lúc này mới gọi API thực sự
                 if sub_info.over18:
                     risk_level = "high"
                     risk_score = 9
                     rationale = "NSFW."
-            except Exception as e:
-                print(f"--> Lỗi khi lấy info subreddit {sub_name}: {e}")
+            except Exception:
+                # Nếu lỗi mạng khi check info, cứ coi như low risk để trả về kết quả
+                pass
 
             results.append({
                 "name": f"r/{sub_name}",
@@ -275,15 +257,9 @@ def get_user_top_subreddits(username: str):
         print(f"Lỗi Reddit API khi lấy subreddits: {e}")
         return []
 
-# --- ĐOẠN CODE ĐỂ TEST NHANH (HARDCODE) ---
+# --- ĐOẠN CODE ĐỂ TEST NHANH ---
 if __name__ == "__main__":
-    # Bạn có thể chạy trực tiếp file này để test: python -m backend.services.reddit_service
     test_user = "spez"
     print(f"--- Đang test user: {test_user} ---")
-    
-    # Test lấy hết dữ liệu
-    data = get_user_interactions(test_user)
-    
+    data = get_user_interactions(test_user, limit=5)
     print(f"Kết quả: Tìm thấy {len(data)} interactions.")
-    for item in data[:5]: # In thử 5 cái đầu
-        print(f"- [{item['type']}] {item['subreddit']}: {item['content'][:50]}...")

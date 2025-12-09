@@ -47,6 +47,6 @@ def acknowledge(
     if alert.child_id not in child_ids:
         raise HTTPException(status_code=403, detail="You don't have permission to acknowledge this alert")
     
-    alert.status = "acknowledged"
-    db.commit()
+        alert.status = "acknowledged"
+        db.commit()
     return {"status": "ok"}

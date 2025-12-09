@@ -1,143 +1,102 @@
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
+from transformers import AutoModelForSequenceClassification, AutoTokenizer, set_seed
 import torch
 import numpy as np
-import random
 
-# Set seeds để đảm bảo kết quả nhất quán (deterministic)
-torch.manual_seed(42)
-np.random.seed(42)
-random.seed(42)
-if torch.cuda.is_available():
-    torch.cuda.manual_seed_all(42)
+# 1. CỐ ĐỊNH KẾT QUẢ (DETERMINISTIC)
+# set_seed(42) của transformers sẽ tự động set cho cả random, numpy và torch
+set_seed(42)
 
-# Sử dụng model từ Hugging Face - DistilBERT fine-tuned cho SST-2 (sentiment analysis)
-model_name = "distilbert/distilbert-base-uncased-finetuned-sst-2-english"
-# Model này phân loại positive/negative cho sentiment analysis
+# Cấu hình Model
+MODEL_NAME = "distilbert/distilbert-base-uncased-finetuned-sst-2-english"
 
-THRESHOLD = 0.5  # Threshold cho binary classification (thường là 0.5)
-
-# Mapping cho binary classification
-# Model SST-2 có: 0: "NEGATIVE", 1: "POSITIVE"
-# Chúng ta sẽ chuyển đổi sang format "hate"/"non-hate" để tương thích với code hiện tại
+# Logic mapping: Negative -> Hate, Positive -> Non-hate
+# Lưu ý: Model SST-2 trả về ID 0 (NEGATIVE) và 1 (POSITIVE)
 LABEL_MAPPING = {
-    0: "negative",  # NEGATIVE sentiment
-    1: "positive"   # POSITIVE sentiment
+    0: "hate",      # Tương ứng với NEGATIVE sentiment
+    1: "non-hate"   # Tương ứng với POSITIVE sentiment
 }
 
-# Mapping từ LABEL_X sang tên thực tế (nếu model trả về LABEL_X)
-LABEL_X_MAPPING = {
-    "LABEL_0": "negative",
-    "LABEL_1": "positive"
-}
-
-# Mapping từ sentiment sang risk level
-# Negative sentiment có thể chỉ ra nội dung nguy hiểm
-SENTIMENT_TO_RISK = {
-    "negative": "hate",      # Negative sentiment -> có thể là hate speech
-    "positive": "non-hate",  # Positive sentiment -> không phải hate speech
-    "NEGATIVE": "hate",
-    "POSITIVE": "non-hate"
-}
-
-
-# Lazy loading - chỉ load khi được gọi lần đầu
+# Biến toàn cục để lưu model (Singleton pattern)
 _tokenizer = None
 _model = None
 
 def _load_model():
-    """Load model và tokenizer chỉ một lần"""
+    """Load model và tokenizer chỉ một lần duy nhất."""
     global _tokenizer, _model
     if _tokenizer is None or _model is None:
         print("   -> Loading DistilBERT sentiment analysis model (SST-2)...")
-        _tokenizer = AutoTokenizer.from_pretrained(model_name)
-        _model = AutoModelForSequenceClassification.from_pretrained(model_name)
+        _tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+        _model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME)
+        
+        # QUAN TRỌNG: Chuyển model sang chế độ đánh giá (Evaluation Mode)
+        # Lệnh này tắt Dropout layers -> Kết quả sẽ cố định 100% mỗi lần chạy
         _model.eval()
+        
         print("   -> Model loaded successfully!")
-        print(f"   -> Model config: {_model.config.id2label if hasattr(_model.config, 'id2label') else 'No id2label'}")
     return _tokenizer, _model
 
-def predict_sentiment(text, threshold=THRESHOLD, return_probability=False):
+def predict_sentiment(text, return_probability=False):
     """
-    Dự đoán sentiment classification cho một text sử dụng DistilBERT SST-2
-    
-    Args:
-        text: Text cần phân loại
-        threshold: Ngưỡng để phân loại (default: 0.5)
-        return_probability: Nếu True, trả về thêm probability
-    
-    Returns:
-        Nếu return_probability=False: String label "hate" hoặc "non-hate" (tương thích với code hiện tại)
-        Nếu return_probability=True: Dict với 'label', 'score', và 'probabilities'
+    Dự đoán hate/non-hate dựa trên sentiment.
+    Kết quả sẽ luôn NHẤT QUÁN (deterministic) nhờ set_seed và model.eval().
     """
-    # Load model nếu chưa load
     tokenizer, model = _load_model()
     
-    # Đảm bảo model ở eval mode (không training)
-    model.eval()
+    # 1. Tokenize input
+    inputs = tokenizer(
+        text, 
+        return_tensors="pt", 
+        truncation=True, 
+        max_length=512, 
+        padding=True
+    )
     
-    # Tokenize
-    inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512, padding=True)
-    
-    # Dự đoán với deterministic mode
+    # 2. Dự đoán (Tắt gradient để tiết kiệm RAM và tăng tốc)
     with torch.no_grad():
-        # Tắt dropout và các layers stochastic nếu có
         outputs = model(**inputs)
         logits = outputs.logits.numpy()[0]
     
-    # Chuyển logits thành probabilities (softmax cho binary classification)
+    # 3. Tính xác suất (Softmax)
     probs = torch.softmax(torch.tensor(logits), dim=-1).numpy()
     
-    # Lấy prediction
+    # 4. Lấy nhãn có xác suất cao nhất
     predicted_idx = np.argmax(probs)
-    
-    # Lấy label từ model config
-    # Model SST-2 thường có id2label: {0: "NEGATIVE", 1: "POSITIVE"}
-    predicted_sentiment = None
-    if hasattr(model.config, 'id2label') and model.config.id2label:
-        id2label = model.config.id2label
-        if isinstance(list(id2label.keys())[0], str):
-            id2label = {int(k): v for k, v in id2label.items()}
-        label_key = id2label.get(predicted_idx, f"LABEL_{predicted_idx}")
-        # Map từ model label (NEGATIVE/POSITIVE) sang format của chúng ta
-        predicted_sentiment = SENTIMENT_TO_RISK.get(label_key, label_key.lower())
-    else:
-        # Fallback: dùng mapping mặc định
-        predicted_sentiment = SENTIMENT_TO_RISK.get(LABEL_MAPPING.get(predicted_idx, ""), "non-hate")
-    
-    # Chuyển đổi sang format "hate"/"non-hate" để tương thích với code hiện tại
-    # Negative sentiment -> có thể là hate speech (cần kết hợp với rules-based detection)
-    # Positive sentiment -> không phải hate speech
-    if predicted_sentiment in ["negative", "NEGATIVE", "hate"]:
-        final_label = "hate"
-    else:
-        final_label = "non-hate"
-    
+    final_label = LABEL_MAPPING.get(predicted_idx, "non-hate")
     confidence = probs[predicted_idx]
     
+    # 5. Trả về kết quả
     if return_probability:
-        # Tạo probabilities dict với tên label thực tế
-        prob_dict = {}
-        for i, prob in enumerate(probs):
-            if hasattr(model.config, 'id2label') and model.config.id2label:
-                id2label = model.config.id2label
-                if isinstance(list(id2label.keys())[0], str):
-                    id2label = {int(k): v for k, v in id2label.items()}
-                label_key = id2label.get(i, f"LABEL_{i}")
-                # Map sang format của chúng ta
-                sentiment_label = SENTIMENT_TO_RISK.get(label_key, label_key.lower())
-                if sentiment_label in ["negative", "NEGATIVE", "hate"]:
-                    label_name = "hate"
-                else:
-                    label_name = "non-hate"
-            else:
-                label_name = SENTIMENT_TO_RISK.get(LABEL_MAPPING.get(i, ""), "non-hate")
-            prob_dict[label_name] = float(prob)
+        # Tạo dict xác suất chi tiết
+        prob_dict = {
+            "hate": float(probs[0]),      # Index 0 là NEGATIVE (quy ước là hate)
+            "non-hate": float(probs[1])   # Index 1 là POSITIVE (quy ước là non-hate)
+        }
         
+        # Xác định sentiment gốc để tham khảo
+        original_sentiment = "NEGATIVE" if predicted_idx == 0 else "POSITIVE"
+
         return {
             'label': final_label,
             'score': float(confidence),
             'probabilities': prob_dict,
-            'sentiment': predicted_sentiment  # Thêm thông tin sentiment gốc
+            'sentiment': original_sentiment
         }
     else:
         return final_label
+
+# --- Test nhanh ---
+if __name__ == "__main__":
+    test_text = "I hate everyone and everything."
+    print(f"Input: '{test_text}'")
+    
+    # Chạy thử 2 lần để kiểm tra độ ổn định
+    result1 = predict_sentiment(test_text, return_probability=True)
+    print(f"Run 1: {result1['label']} ({result1['score']:.4f})")
+    
+    result2 = predict_sentiment(test_text, return_probability=True)
+    print(f"Run 2: {result2['label']} ({result2['score']:.4f})")
+    
+    if result1['score'] == result2['score']:
+        print("=> SUCCESS: Kết quả ổn định (Deterministic).")
+    else:
+        print("=> WARNING: Kết quả khác nhau!")

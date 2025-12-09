@@ -177,7 +177,7 @@ export function SettingsPage() {
       );
 
       if (response.ok) {
-        toast.success("Notification preferences updated!");
+    toast.success("Notification preferences updated!");
       } else {
         toast.error("Failed to update preferences");
       }
@@ -512,7 +512,7 @@ export function SettingsPage() {
               {isSaving ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
-                <Save className="h-4 w-4 mr-2" />
+              <Save className="h-4 w-4 mr-2" />
               )}
               Save Preferences
             </Button>
@@ -537,70 +537,70 @@ export function SettingsPage() {
               </div>
             ) : (
               <>
-                <div className="space-y-3">
+            <div className="space-y-3">
                   {children.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       No children added yet. Add one below to start monitoring.
                     </div>
                   ) : (
                     children.map((child) => (
-                      <div
-                        key={child.id}
-                        className="flex items-center justify-between p-4 border rounded-xl transition-all group
-                          bg-white hover:shadow-sm 
-                          dark:bg-slate-900 dark:border-slate-800 dark:hover:bg-slate-800/50"
-                      >
-                        <div className="flex items-center gap-4">
-                          <Avatar className="h-12 w-12 border-2 
-                            bg-slate-100 border-slate-200 text-slate-600
-                            dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300">
-                            <AvatarFallback className="text-lg font-bold">
+                <div
+                  key={child.id}
+                  className="flex items-center justify-between p-4 border rounded-xl transition-all group
+                    bg-white hover:shadow-sm 
+                    dark:bg-slate-900 dark:border-slate-800 dark:hover:bg-slate-800/50"
+                >
+                  <div className="flex items-center gap-4">
+                    <Avatar className="h-12 w-12 border-2 
+                      bg-slate-100 border-slate-200 text-slate-600
+                      dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300">
+                      <AvatarFallback className="text-lg font-bold">
                               {child.name[0].toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="font-semibold text-base text-foreground">
-                              {child.name}
-                            </p>
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                              <span className="relative flex h-2 w-2">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                              </span>
-                              <span className="text-xs text-muted-foreground font-medium">
-                                Monitoring Active
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-muted-foreground transition-colors
-                            hover:text-red-600 hover:bg-red-50 
-                            dark:hover:bg-red-900/20 dark:hover:text-red-400"
-                          onClick={() => handleDeleteChild(child)}
-                          title="Remove child"
-                        >
-                          <Trash2 className="h-5 w-5" />
-                          <span className="sr-only">Delete</span>
-                        </Button>
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-semibold text-base text-foreground">
+                        {child.name}
+                      </p>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                        </span>
+                        <span className="text-xs text-muted-foreground font-medium">
+                          Monitoring Active
+                        </span>
                       </div>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground transition-colors
+                      hover:text-red-600 hover:bg-red-50 
+                      dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                          onClick={() => handleDeleteChild(child)}
+                    title="Remove child"
+                  >
+                    <Trash2 className="h-5 w-5" />
+                    <span className="sr-only">Delete</span>
+                  </Button>
+                </div>
                     ))
                   )}
-                </div>
+            </div>
 
                 <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full h-12 border-dashed border-2 transition-all mt-2
-                        text-slate-500 hover:border-red-500 hover:bg-red-50 hover:text-red-600
-                        dark:border-slate-700 dark:text-slate-400 dark:hover:bg-red-900/10 dark:hover:text-red-400 dark:hover:border-red-500/50"
-                    >
+            <Button
+              variant="outline"
+              className="w-full h-12 border-dashed border-2 transition-all mt-2
+                text-slate-500 hover:border-red-500 hover:bg-red-50 hover:text-red-600
+                dark:border-slate-700 dark:text-slate-400 dark:hover:bg-red-900/10 dark:hover:text-red-400 dark:hover:border-red-500/50"
+            >
                       <UserPlus className="h-5 w-5 mr-2" />
-                      Add New Child
-                    </Button>
+              Add New Child
+            </Button>
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>

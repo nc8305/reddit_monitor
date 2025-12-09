@@ -342,27 +342,27 @@ export function ChildMonitoring() {
     }
 
     // Reset displayed interactions trước khi stream
-    setDisplayedInteractions([]);
-    setIsStreaming(true);
+      setDisplayedInteractions([]);
+      setIsStreaming(true);
 
-    let index = 0;
-    const streamInterval = setInterval(() => {
-      if (index < rawInteractions.length) {
-        setDisplayedInteractions(prev => [rawInteractions[index], ...prev]);
-        index++;
-      } else {
-        clearInterval(streamInterval);
-        setIsStreaming(false);
-      }
-    }, 200);
+      let index = 0;
+      const streamInterval = setInterval(() => {
+        if (index < rawInteractions.length) {
+          setDisplayedInteractions(prev => [rawInteractions[index], ...prev]);
+          index++;
+        } else {
+          clearInterval(streamInterval);
+          setIsStreaming(false);
+        }
+      }, 200);
 
     // Cleanup function để dừng stream khi:
     // - rawInteractions thay đổi (child mới)
     // - Component unmount
-    return () => {
-      clearInterval(streamInterval);
-      setIsStreaming(false);
-    };
+      return () => {
+        clearInterval(streamInterval);
+        setIsStreaming(false);
+      };
   }, [rawInteractions]);
 
   // Fetch data when child or filters change
@@ -370,9 +370,9 @@ export function ChildMonitoring() {
     if (!selectedChildId) return;
     
     // Reset data trước khi fetch
-    setDisplayedInteractions([]);
+      setDisplayedInteractions([]);
     setRawInteractions([]);
-    setIsStreaming(false);
+      setIsStreaming(false);
 
     // Chỉ fetch khi không đang stream
     if (!isStreaming) {
@@ -388,9 +388,9 @@ export function ChildMonitoring() {
     // Polling interval: 2 giây - tự động cập nhật data mới từ DB
     const pollingInterval = setInterval(() => {
       // Chỉ fetch khi không đang stream
-      if (!isStreaming) {
-        fetchInteractions();
-        fetchSubreddits();
+    if (!isStreaming) {
+      fetchInteractions();
+    fetchSubreddits();
       }
     }, 2000); // 2 giây
 
