@@ -312,11 +312,11 @@ export function SettingsPage() {
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="high"
-                      checked={notifications.highSeverity}
+                      checked={notifications.high_severity}
                       onCheckedChange={(checked) =>
                         setNotifications({
                           ...notifications,
-                          highSeverity: checked as boolean,
+                          high_severity: checked as boolean,
                         })
                       }
                       className="data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600 border-red-200 dark:border-red-800"
@@ -331,11 +331,11 @@ export function SettingsPage() {
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="medium"
-                      checked={notifications.mediumSeverity}
+                      checked={notifications.medium_severity}
                       onCheckedChange={(checked) =>
                         setNotifications({
                           ...notifications,
-                          mediumSeverity: checked as boolean,
+                          medium_severity: checked as boolean,
                         })
                       }
                       className="data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500 dark:border-slate-600"
@@ -347,11 +347,11 @@ export function SettingsPage() {
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="low"
-                      checked={notifications.lowSeverity}
+                      checked={notifications.low_severity}
                       onCheckedChange={(checked) =>
                         setNotifications({
                           ...notifications,
-                          lowSeverity: checked as boolean,
+                          low_severity: checked as boolean,
                         })
                       }
                       className="dark:border-slate-600"
@@ -364,11 +364,11 @@ export function SettingsPage() {
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="selfharm"
-                      checked={notifications.selfHarmOnly}
+                      checked={notifications.self_harm_only}
                       onCheckedChange={(checked) =>
                         setNotifications({
                           ...notifications,
-                          selfHarmOnly: checked as boolean,
+                          self_harm_only: checked as boolean,
                         })
                       }
                       className="border-red-500 text-red-500 focus:ring-red-500 dark:border-red-700"
@@ -393,11 +393,11 @@ export function SettingsPage() {
                     bg-background hover:bg-red-50/30 dark:hover:bg-red-900/10 dark:border-slate-700">
                     <Checkbox
                       id="inApp"
-                      checked={notifications.inApp}
+                      checked={notifications.in_app}
                       onCheckedChange={(checked) =>
                         setNotifications({
                           ...notifications,
-                          inApp: checked as boolean,
+                          in_app: checked as boolean,
                         })
                       }
                       className="data-[state=checked]:bg-red-600 border-slate-300 dark:border-slate-600"
@@ -506,9 +506,14 @@ export function SettingsPage() {
 
             <Button
               onClick={handleSaveNotifications}
+              disabled={isSaving}
               className="w-full bg-red-600 hover:bg-red-700 shadow-md text-white dark:bg-red-700 dark:hover:bg-red-600"
             >
-              <Save className="h-4 w-4 mr-2" />
+              {isSaving ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
               Save Preferences
             </Button>
           </CardContent>
@@ -526,62 +531,161 @@ export function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-3">
-              {children.map((child) => (
-                <div
-                  key={child.id}
-                  className="flex items-center justify-between p-4 border rounded-xl transition-all group
-                    bg-white hover:shadow-sm 
-                    dark:bg-slate-900 dark:border-slate-800 dark:hover:bg-slate-800/50"
-                >
-                  <div className="flex items-center gap-4">
-                    <Avatar className="h-12 w-12 border-2 
-                      bg-slate-100 border-slate-200 text-slate-600
-                      dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300">
-                      <AvatarFallback className="text-lg font-bold">
-                        {child.avatar}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-semibold text-base text-foreground">
-                        {child.name}
-                      </p>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className="relative flex h-2 w-2">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                        </span>
-                        <span className="text-xs text-muted-foreground font-medium">
-                          Monitoring Active
-                        </span>
+            {isLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <>
+                <div className="space-y-3">
+                  {children.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No children added yet. Add one below to start monitoring.
+                    </div>
+                  ) : (
+                    children.map((child) => (
+                      <div
+                        key={child.id}
+                        className="flex items-center justify-between p-4 border rounded-xl transition-all group
+                          bg-white hover:shadow-sm 
+                          dark:bg-slate-900 dark:border-slate-800 dark:hover:bg-slate-800/50"
+                      >
+                        <div className="flex items-center gap-4">
+                          <Avatar className="h-12 w-12 border-2 
+                            bg-slate-100 border-slate-200 text-slate-600
+                            dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300">
+                            <AvatarFallback className="text-lg font-bold">
+                              {child.name[0].toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-semibold text-base text-foreground">
+                              {child.name}
+                            </p>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="relative flex h-2 w-2">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                              </span>
+                              <span className="text-xs text-muted-foreground font-medium">
+                                Monitoring Active
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-muted-foreground transition-colors
+                            hover:text-red-600 hover:bg-red-50 
+                            dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                          onClick={() => handleDeleteChild(child)}
+                          title="Remove child"
+                        >
+                          <Trash2 className="h-5 w-5" />
+                          <span className="sr-only">Delete</span>
+                        </Button>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full h-12 border-dashed border-2 transition-all mt-2
+                        text-slate-500 hover:border-red-500 hover:bg-red-50 hover:text-red-600
+                        dark:border-slate-700 dark:text-slate-400 dark:hover:bg-red-900/10 dark:hover:text-red-400 dark:hover:border-red-500/50"
+                    >
+                      <UserPlus className="h-5 w-5 mr-2" />
+                      Add New Child
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Add New Child</DialogTitle>
+                      <DialogDescription>
+                        Enter the child's information to start monitoring their Reddit activity.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid gap-2">
+                        <Label>Display Name</Label>
+                        <Input
+                          placeholder="Ex: Emma, Lucas"
+                          value={newChildName}
+                          onChange={(e) => setNewChildName(e.target.value)}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>Age</Label>
+                        <Input
+                          type="number"
+                          placeholder="15"
+                          value={newChildAge}
+                          onChange={(e) => setNewChildAge(e.target.value)}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>Reddit Username</Label>
+                        <Input
+                          placeholder="u/username or username"
+                          value={newChildUsername}
+                          onChange={(e) => setNewChildUsername(e.target.value)}
+                        />
                       </div>
                     </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-muted-foreground transition-colors
-                      hover:text-red-600 hover:bg-red-50 
-                      dark:hover:bg-red-900/20 dark:hover:text-red-400"
-                    onClick={() => handleDeleteChild(child.name)}
-                    title="Remove child"
-                  >
-                    <Trash2 className="h-5 w-5" />
-                    <span className="sr-only">Delete</span>
-                  </Button>
-                </div>
-              ))}
-            </div>
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsAddDialogOpen(false)}
+                        disabled={isAdding}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleAddChild}
+                        disabled={isAdding}
+                        className="bg-red-600 hover:bg-red-700 text-white"
+                      >
+                        {isAdding ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Adding...
+                          </>
+                        ) : (
+                          <>
+                            <UserPlus className="h-4 w-4 mr-2" />
+                            Add Child
+                          </>
+                        )}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
 
-            <Button
-              variant="outline"
-              className="w-full h-12 border-dashed border-2 transition-all mt-2
-                text-slate-500 hover:border-red-500 hover:bg-red-50 hover:text-red-600
-                dark:border-slate-700 dark:text-slate-400 dark:hover:bg-red-900/10 dark:hover:text-red-400 dark:hover:border-red-500/50"
-            >
-              <Users className="h-5 w-5 mr-2" />
-              Add New Child
-            </Button>
+                <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Remove Child?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to remove {childToDelete?.name} from monitoring? This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={confirmDeleteChild}
+                        className="bg-red-600 hover:bg-red-700 text-white"
+                      >
+                        Remove
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

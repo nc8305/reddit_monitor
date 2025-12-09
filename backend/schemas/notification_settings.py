@@ -17,6 +17,12 @@ class NotificationSettingsResponse(NotificationSettingsBase):
     class Config:
         from_attributes = True
 
-class NotificationSettingsUpdate(NotificationSettingsBase):
-    pass
+class NotificationSettingsUpdate(BaseModel):
+    in_app: Optional[bool] = None
+    email: Optional[bool] = None
+    high_severity: Optional[bool] = None
+    medium_severity: Optional[bool] = None
+    low_severity: Optional[bool] = None
+    self_harm_only: Optional[bool] = None
+    frequency: Optional[str] = None
 

@@ -54,14 +54,21 @@ def update_notification_settings(
         settings = NotificationSettings(user_id=current_user.id)
         db.add(settings)
     
-    # Update các fields
-    settings.in_app = settings_update.in_app
-    settings.email = settings_update.email
-    settings.high_severity = settings_update.high_severity
-    settings.medium_severity = settings_update.medium_severity
-    settings.low_severity = settings_update.low_severity
-    settings.self_harm_only = settings_update.self_harm_only
-    settings.frequency = settings_update.frequency
+    # Update các fields (chỉ update nếu có giá trị)
+    if settings_update.in_app is not None:
+        settings.in_app = settings_update.in_app
+    if settings_update.email is not None:
+        settings.email = settings_update.email
+    if settings_update.high_severity is not None:
+        settings.high_severity = settings_update.high_severity
+    if settings_update.medium_severity is not None:
+        settings.medium_severity = settings_update.medium_severity
+    if settings_update.low_severity is not None:
+        settings.low_severity = settings_update.low_severity
+    if settings_update.self_harm_only is not None:
+        settings.self_harm_only = settings_update.self_harm_only
+    if settings_update.frequency is not None:
+        settings.frequency = settings_update.frequency
     
     db.commit()
     db.refresh(settings)
