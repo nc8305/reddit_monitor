@@ -20,15 +20,25 @@ LABEL_MAPPING = {
 
 # Mapping từ LABEL_X sang tên thực tế (nếu model trả về LABEL_X)
 LABEL_X_MAPPING = {
-    "LABEL_0": "hate",
-    "LABEL_1": "non-hate"
+    "LABEL_0": "non-hate",
+    "LABEL_1": "hate"
 }
 
 
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForSequenceClassification.from_pretrained(model_name)
-model.eval()
+# Lazy loading - chỉ load khi được gọi lần đầu
+_tokenizer = None
+_model = None
 
+def _load_model():
+    """Load model và tokenizer chỉ một lần"""
+    global _tokenizer, _model
+    if _tokenizer is None or _model is None:
+        print("   -> Loading hate speech classification model...")
+        _tokenizer = AutoTokenizer.from_pretrained(model_name)
+        _model = AutoModelForSequenceClassification.from_pretrained(model_name)
+        _model.eval()
+        print("   -> Model loaded successfully!")
+    return _tokenizer, _model
 
 def predict_sentiment(text, threshold=THRESHOLD, return_probability=False):
     """
@@ -43,6 +53,9 @@ def predict_sentiment(text, threshold=THRESHOLD, return_probability=False):
         Nếu return_probability=False: String label (từ model config hoặc mapping)
         Nếu return_probability=True: Dict với 'label' và 'score'
     """
+    # Load model nếu chưa load
+    tokenizer, model = _load_model()
+    
     # Tokenize
     inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=128, padding=True)
     
@@ -92,4 +105,3 @@ def predict_sentiment(text, threshold=THRESHOLD, return_probability=False):
         }
     else:
         return predicted_label
-classify.py

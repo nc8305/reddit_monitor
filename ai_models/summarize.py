@@ -9,11 +9,20 @@ import torch
 # Model name
 MODEL_NAME = "sshleifer/distilbart-cnn-12-6"
 
-# Load model và tokenizer (chỉ load 1 lần khi import)
-tokenizer = BartTokenizer.from_pretrained(MODEL_NAME)
-model = BartForConditionalGeneration.from_pretrained(MODEL_NAME)
-model.eval()
+# Lazy loading - chỉ load khi được gọi lần đầu
+_tokenizer = None
+_model = None
 
+def _load_model():
+    """Load model và tokenizer chỉ một lần"""
+    global _tokenizer, _model
+    if _tokenizer is None or _model is None:
+        print("   -> Loading summarization model...")
+        _tokenizer = BartTokenizer.from_pretrained(MODEL_NAME)
+        _model = BartForConditionalGeneration.from_pretrained(MODEL_NAME)
+        _model.eval()
+        print("   -> Model loaded successfully!")
+    return _tokenizer, _model
 
 def summarize_text(
     text,
@@ -39,6 +48,9 @@ def summarize_text(
     Returns:
         String: Câu tóm tắt của đoạn văn bản
     """
+    # Load model nếu chưa load
+    tokenizer, model = _load_model()
+    
     # Tokenize input
     inputs = tokenizer(
         text,

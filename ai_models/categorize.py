@@ -28,12 +28,20 @@ LABEL_MAPPING = {
     "LABEL_18": "youth_&_student_life"
 }
 
-# Load model và tokenizer (chỉ load 1 lần)
+# Lazy loading - chỉ load khi được gọi lần đầu
+_tokenizer = None
+_model = None
 
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForSequenceClassification.from_pretrained(model_name)
-model.eval()
-
+def _load_model():
+    """Load model và tokenizer chỉ một lần"""
+    global _tokenizer, _model
+    if _tokenizer is None or _model is None:
+        print("   -> Loading categorization model...")
+        _tokenizer = AutoTokenizer.from_pretrained(model_name)
+        _model = AutoModelForSequenceClassification.from_pretrained(model_name)
+        _model.eval()
+        print("   -> Model loaded successfully!")
+    return _tokenizer, _model
 
 def predict_labels(text, threshold=THRESHOLD, return_list=False):
     """
@@ -48,6 +56,9 @@ def predict_labels(text, threshold=THRESHOLD, return_list=False):
         Nếu return_list=True: List các label names
         Nếu return_list=False: String các label names cách nhau bởi dấu phẩy
     """
+    # Load model nếu chưa load
+    tokenizer, model = _load_model()
+    
     # Tokenize
     inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=256)
     

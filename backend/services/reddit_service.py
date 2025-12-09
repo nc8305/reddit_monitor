@@ -4,7 +4,7 @@ from collections import Counter
 from backend.config.env_settings import env_settings
 import socket
 import requests.packages.urllib3.util.connection as urllib3_cn
-
+import requests
 # --- 1. FIX LỖI TREO MẠNG (IPv6) ---
 def allowed_gai_family():
     return socket.AF_INET
@@ -13,10 +13,15 @@ urllib3_cn.allowed_gai_family = allowed_gai_family
 # -----------------------------------
 
 # Khởi tạo Reddit
+session = requests.Session()
 reddit = praw.Reddit(
     client_id=env_settings.REDDIT_CLIENT_ID,
     client_secret=env_settings.REDDIT_CLIENT_SECRET,
-    user_agent=env_settings.REDDIT_USER_AGENT
+    user_agent=env_settings.REDDIT_USER_AGENT,
+    requestor_kwargs={
+        'session': session,  # Dùng session có cơ chế retry
+        'timeout': 60        # Tăng timeout lên 60 giây
+    }
 )
 
 def get_relative_time(created_utc):
@@ -28,6 +33,14 @@ def get_relative_time(created_utc):
     if diff < 3600: return f"{diff // 60}m ago"
     if diff < 86400: return f"{diff // 3600}h ago"
     return f"{diff // 86400}d ago"
+
+
+
+# Tự động thử lại 3 lần nếu lỗi mạng (status 500, 502, 504...)
+adapter = requests.adapters.HTTPAdapter(max_retries=3) 
+session.mount('https://', adapter)
+session.mount('http://', adapter)
+
 
 def get_user_interactions(username: str):
     """
@@ -46,7 +59,7 @@ def get_user_interactions(username: str):
 
         # 1. Lấy Comments (limit=None để lấy tối đa)
         try:
-            for comment in user.comments.new(limit=None):
+            for comment in user.comments.new(limit=10):
                 risk_level = "low"
                 sentiment = "Neutral"
                 
@@ -72,7 +85,7 @@ def get_user_interactions(username: str):
 
         # 2. Lấy Posts (limit=None để lấy tối đa)
         try:
-            for post in user.submissions.new(limit=None):
+            for post in user.submissions.new(limit=10):
                 risk_level = "low"
                 sentiment = "Neutral"
                 
@@ -119,12 +132,6 @@ def get_user_top_subreddits(username: str):
             # limit=None để quét hết lịch sử
             for comment in user.comments.new(limit=None):
                 subreddit_counts[comment.subreddit.display_name] += 1
-        except: pass
-
-        try:
-            # limit=None để quét hết lịch sử
-            for submission in user.submissions.new(limit=None):
-                subreddit_counts[submission.subreddit.display_name] += 1
         except: pass
 
         # Lấy Top 10 frequent nhất

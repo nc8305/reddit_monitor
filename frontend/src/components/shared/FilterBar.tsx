@@ -26,6 +26,7 @@ interface FilterBarProps {
   showSubredditFilter?: boolean;
   subredditFilter?: string;
   onSubredditFilterChange?: (value: string) => void;
+  subredditOptions?: string[]; // List of subreddit names for dropdown
   onClearFilters?: () => void;
 }
 
@@ -49,6 +50,7 @@ export function FilterBar({
   showSubredditFilter = false,
   subredditFilter = "all",
   onSubredditFilterChange,
+  subredditOptions = [],
   onClearFilters
 }: FilterBarProps) {
   return (
@@ -94,13 +96,34 @@ export function FilterBar({
         </Select>
       )}
 
-      {/* Các phần khác giữ nguyên ... */}
+      {/* --- DATE RANGE FILTER --- */}
+      {showDateFilter && (
+        <Select value={dateFilter} onValueChange={onDateFilterChange}>
+          <SelectTrigger className="w-full sm:w-[150px]">
+            <SelectValue placeholder="Time Range" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Time</SelectItem>
+            <SelectItem value="today">Today</SelectItem>
+            <SelectItem value="7days">Last 7 Days</SelectItem>
+            <SelectItem value="30days">Last 30 Days</SelectItem>
+          </SelectContent>
+        </Select>
+      )}
+
+      {/* Subreddit Filter */}
       {showSubredditFilter && (
-         /* ... code cũ ... */
          <Select value={subredditFilter} onValueChange={onSubredditFilterChange}>
-            <SelectTrigger className="w-full sm:w-[140px]"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectValue placeholder="Subreddit" />
+            </SelectTrigger>
             <SelectContent>
                 <SelectItem value="all">All Subreddits</SelectItem>
+                {subredditOptions.map((sub) => (
+                  <SelectItem key={sub} value={sub}>
+                    r/{sub}
+                  </SelectItem>
+                ))}
             </SelectContent>
          </Select>
       )}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -28,31 +28,247 @@ import {
   Save,
   AlertCircle,
   Trash2,
+  Loader2,
+  UserPlus,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "../ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../ui/alert-dialog";
+
+interface Child {
+  id: number;
+  name: string;
+  age: number;
+  reddit_username: string;
+  avatar_url?: string;
+}
+
+interface NotificationSettings {
+  in_app: boolean;
+  email: boolean;
+  high_severity: boolean;
+  medium_severity: boolean;
+  low_severity: boolean;
+  self_harm_only: boolean;
+  frequency: string;
+}
+
 export function SettingsPage() {
-  const [notifications, setNotifications] = useState({
-    inApp: true,
+  const [notifications, setNotifications] = useState<NotificationSettings>({
+    in_app: true,
     email: true,
-    highSeverity: true,
-    mediumSeverity: true,
-    lowSeverity: false,
-    selfHarmOnly: false,
+    high_severity: true,
+    medium_severity: true,
+    low_severity: false,
+    self_harm_only: false,
     frequency: "instant",
   });
 
-  const [children, setChildren] = useState([
-    { id: "emma", name: "Emma", avatar: "E" },
-    { id: "lucas", name: "Lucas", avatar: "L" },
-  ]);
+  const [children, setChildren] = useState<Child[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [childToDelete, setChildToDelete] = useState<Child | null>(null);
+  const [newChildName, setNewChildName] = useState("");
+  const [newChildAge, setNewChildAge] = useState("");
+  const [newChildUsername, setNewChildUsername] = useState("");
+  const [isAdding, setIsAdding] = useState(false);
 
-  const handleSaveNotifications = () => {
-    toast.success("Notification preferences updated!");
+  // Fetch notification settings
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) return;
+
+        const response = await fetch(
+          "http://localhost:8000/api/settings/notifications",
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          setNotifications({
+            in_app: data.in_app ?? true,
+            email: data.email ?? true,
+            high_severity: data.high_severity ?? true,
+            medium_severity: data.medium_severity ?? true,
+            low_severity: data.low_severity ?? false,
+            self_harm_only: data.self_harm_only ?? false,
+            frequency: data.frequency ?? "instant",
+          });
+        }
+      } catch (error) {
+        console.error("Failed to fetch settings", error);
+      }
+    };
+
+    fetchSettings();
+  }, []);
+
+  // Fetch children
+  useEffect(() => {
+    const fetchChildren = async () => {
+      setIsLoading(true);
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) {
+          setIsLoading(false);
+          return;
+        }
+
+        const response = await fetch("http://localhost:8000/api/children/", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setChildren(data);
+        }
+      } catch (error) {
+        toast.error("Failed to load children");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchChildren();
+  }, []);
+
+  const handleSaveNotifications = async () => {
+    setIsSaving(true);
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error("Please log in");
+        return;
+      }
+
+      const response = await fetch(
+        "http://localhost:8000/api/settings/notifications",
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(notifications),
+        }
+      );
+
+      if (response.ok) {
+        toast.success("Notification preferences updated!");
+      } else {
+        toast.error("Failed to update preferences");
+      }
+    } catch (error) {
+      toast.error("Error updating preferences");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleDeleteChild = (childName: string) => {
-    toast.success(`Removed ${childName} from monitoring.`);
-    // Logic to remove child would go here
+  const handleDeleteChild = (child: Child) => {
+    setChildToDelete(child);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteChild = async () => {
+    if (!childToDelete) return;
+
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error("Please log in");
+        return;
+      }
+
+      const response = await fetch(
+        `http://localhost:8000/api/children/${childToDelete.id}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (response.ok) {
+        toast.success(`Removed ${childToDelete.name} from monitoring.`);
+        setChildren(children.filter((c) => c.id !== childToDelete.id));
+      } else {
+        toast.error("Failed to remove child");
+      }
+    } catch (error) {
+      toast.error("Error removing child");
+    } finally {
+      setIsDeleteDialogOpen(false);
+      setChildToDelete(null);
+    }
+  };
+
+  const handleAddChild = async () => {
+    if (!newChildName.trim() || !newChildUsername.trim() || !newChildAge.trim()) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+
+    setIsAdding(true);
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        toast.error("Please log in");
+        return;
+      }
+
+      const response = await fetch("http://localhost:8000/api/children/", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: newChildName.trim(),
+          age: parseInt(newChildAge),
+          reddit_username: newChildUsername.trim().replace(/^u\//, ""),
+        }),
+      });
+
+      if (response.ok) {
+        const newChild = await response.json();
+        setChildren([...children, newChild]);
+        toast.success(`Added ${newChildName} to monitoring.`);
+        setIsAddDialogOpen(false);
+        setNewChildName("");
+        setNewChildAge("");
+        setNewChildUsername("");
+      } else {
+        const error = await response.json();
+        toast.error(error.detail || "Failed to add child");
+      }
+    } catch (error) {
+      toast.error("Error adding child");
+    } finally {
+      setIsAdding(false);
+    }
   };
 
   return (
@@ -70,10 +286,12 @@ export function SettingsPage() {
 
       <div className="grid gap-8 md:grid-cols-2">
         {/* Notification Preferences */}
-        <Card className="shadow-sm border-t-4 border-t-red-500 h-fit">
-          <CardHeader className="bg-red-50/50 pb-4 border-b border-red-100">
-            <div className="flex items-center gap-2 text-red-600">
-              <Bell className="h-5 w-5 fill-red-600" />
+        <Card className="shadow-sm border-t-4 border-t-red-500 h-fit dark:border-t-red-600">
+          <CardHeader className="pb-4 border-b 
+            bg-red-50/50 border-red-100 
+            dark:bg-red-950/20 dark:border-red-900/50">
+            <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+              <Bell className="h-5 w-5 fill-red-600 dark:fill-red-400" />
               <CardTitle>Alert Preferences</CardTitle>
             </div>
             <CardDescription>
@@ -88,7 +306,9 @@ export function SettingsPage() {
                   <AlertCircle className="w-4 h-4 text-red-500" />
                   Alert Triggers
                 </h4>
-                <div className="space-y-3 bg-muted/30 p-4 rounded-lg border border-red-100/50">
+                <div className="space-y-3 p-4 rounded-lg border 
+                  bg-muted/30 border-red-100/50 
+                  dark:bg-slate-900/50 dark:border-slate-800">
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="high"
@@ -99,11 +319,11 @@ export function SettingsPage() {
                           highSeverity: checked as boolean,
                         })
                       }
-                      className="data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600 border-red-200"
+                      className="data-[state=checked]:bg-red-600 data-[state=checked]:border-red-600 border-red-200 dark:border-red-800"
                     />
                     <label
                       htmlFor="high"
-                      className="text-sm font-medium cursor-pointer text-red-700"
+                      className="text-sm font-medium cursor-pointer text-red-700 dark:text-red-300"
                     >
                       High Severity Alerts
                     </label>
@@ -118,7 +338,7 @@ export function SettingsPage() {
                           mediumSeverity: checked as boolean,
                         })
                       }
-                      className="data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500"
+                      className="data-[state=checked]:bg-orange-500 data-[state=checked]:border-orange-500 dark:border-slate-600"
                     />
                     <label htmlFor="medium" className="text-sm cursor-pointer">
                       Medium Severity Alerts
@@ -134,12 +354,13 @@ export function SettingsPage() {
                           lowSeverity: checked as boolean,
                         })
                       }
+                      className="dark:border-slate-600"
                     />
                     <label htmlFor="low" className="text-sm cursor-pointer">
                       Low Severity Alerts
                     </label>
                   </div>
-                  <Separator className="my-2 bg-red-100" />
+                  <Separator className="my-2 bg-red-100 dark:bg-red-900/30" />
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="selfharm"
@@ -150,11 +371,11 @@ export function SettingsPage() {
                           selfHarmOnly: checked as boolean,
                         })
                       }
-                      className="border-red-500 text-red-500 focus:ring-red-500"
+                      className="border-red-500 text-red-500 focus:ring-red-500 dark:border-red-700"
                     />
                     <label
                       htmlFor="selfharm"
-                      className="text-sm font-bold cursor-pointer text-red-600"
+                      className="text-sm font-bold cursor-pointer text-red-600 dark:text-red-400"
                     >
                       Critical Only (Self-Harm & Crisis)
                     </label>
@@ -168,7 +389,8 @@ export function SettingsPage() {
                   Delivery Channels
                 </h4>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="flex items-center space-x-2 border p-3 rounded-md bg-background hover:bg-red-50/30 transition-colors cursor-pointer">
+                  <div className="flex items-center space-x-2 border p-3 rounded-md transition-colors cursor-pointer
+                    bg-background hover:bg-red-50/30 dark:hover:bg-red-900/10 dark:border-slate-700">
                     <Checkbox
                       id="inApp"
                       checked={notifications.inApp}
@@ -178,7 +400,7 @@ export function SettingsPage() {
                           inApp: checked as boolean,
                         })
                       }
-                      className="data-[state=checked]:bg-red-600 border-slate-300"
+                      className="data-[state=checked]:bg-red-600 border-slate-300 dark:border-slate-600"
                     />
                     <label
                       htmlFor="inApp"
@@ -187,7 +409,8 @@ export function SettingsPage() {
                       In-App
                     </label>
                   </div>
-                  <div className="flex items-center space-x-2 border p-3 rounded-md bg-background hover:bg-red-50/30 transition-colors cursor-pointer">
+                  <div className="flex items-center space-x-2 border p-3 rounded-md transition-colors cursor-pointer
+                    bg-background hover:bg-red-50/30 dark:hover:bg-red-900/10 dark:border-slate-700">
                     <Checkbox
                       id="email"
                       checked={notifications.email}
@@ -197,7 +420,7 @@ export function SettingsPage() {
                           email: checked as boolean,
                         })
                       }
-                      className="data-[state=checked]:bg-red-600 border-slate-300"
+                      className="data-[state=checked]:bg-red-600 border-slate-300 dark:border-slate-600"
                     />
                     <label
                       htmlFor="email"
@@ -223,7 +446,9 @@ export function SettingsPage() {
                   }
                   className="grid grid-cols-3 gap-4"
                 >
-                  <div className="relative flex flex-col items-center justify-center space-y-2 border p-3 rounded-md cursor-pointer hover:bg-red-50/30 transition-colors [&:has(:checked)]:border-red-500 [&:has(:checked)]:bg-red-50">
+                  <div className="relative flex flex-col items-center justify-center space-y-2 border p-3 rounded-md cursor-pointer transition-colors 
+                    hover:bg-red-50/30 dark:hover:bg-red-900/10 dark:border-slate-700
+                    [&:has(:checked)]:border-red-500 [&:has(:checked)]:bg-red-50 dark:[&:has(:checked)]:bg-red-900/20">
                     <RadioGroupItem
                       value="instant"
                       id="instant"
@@ -231,7 +456,7 @@ export function SettingsPage() {
                     />
                     <Label
                       htmlFor="instant"
-                      className="cursor-pointer font-medium text-red-900"
+                      className="cursor-pointer font-medium text-red-900 dark:text-red-300"
                     >
                       Instant
                     </Label>
@@ -239,7 +464,9 @@ export function SettingsPage() {
                       As they occur
                     </span>
                   </div>
-                  <div className="relative flex flex-col items-center justify-center space-y-2 border p-3 rounded-md cursor-pointer hover:bg-red-50/30 transition-colors [&:has(:checked)]:border-red-500 [&:has(:checked)]:bg-red-50">
+                  <div className="relative flex flex-col items-center justify-center space-y-2 border p-3 rounded-md cursor-pointer transition-colors 
+                    hover:bg-red-50/30 dark:hover:bg-red-900/10 dark:border-slate-700
+                    [&:has(:checked)]:border-red-500 [&:has(:checked)]:bg-red-50 dark:[&:has(:checked)]:bg-red-900/20">
                     <RadioGroupItem
                       value="daily"
                       id="daily"
@@ -255,7 +482,9 @@ export function SettingsPage() {
                       Once per day
                     </span>
                   </div>
-                  <div className="relative flex flex-col items-center justify-center space-y-2 border p-3 rounded-md cursor-pointer hover:bg-red-50/30 transition-colors [&:has(:checked)]:border-red-500 [&:has(:checked)]:bg-red-50">
+                  <div className="relative flex flex-col items-center justify-center space-y-2 border p-3 rounded-md cursor-pointer transition-colors 
+                    hover:bg-red-50/30 dark:hover:bg-red-900/10 dark:border-slate-700
+                    [&:has(:checked)]:border-red-500 [&:has(:checked)]:bg-red-50 dark:[&:has(:checked)]:bg-red-900/20">
                     <RadioGroupItem
                       value="weekly"
                       id="weekly"
@@ -277,7 +506,7 @@ export function SettingsPage() {
 
             <Button
               onClick={handleSaveNotifications}
-              className="w-full bg-red-600 hover:bg-red-700 shadow-md text-white"
+              className="w-full bg-red-600 hover:bg-red-700 shadow-md text-white dark:bg-red-700 dark:hover:bg-red-600"
             >
               <Save className="h-4 w-4 mr-2" />
               Save Preferences
@@ -286,9 +515,9 @@ export function SettingsPage() {
         </Card>
 
         {/* Children Management */}
-        <Card className="shadow-sm border-t-4 border-t-slate-500 h-fit">
+        <Card className="shadow-sm border-t-4 border-t-slate-500 h-fit dark:border-t-slate-600">
           <CardHeader>
-            <div className="flex items-center gap-2 text-slate-700">
+            <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
               <Users className="h-5 w-5" />
               <CardTitle>Manage Children</CardTitle>
             </div>
@@ -301,10 +530,14 @@ export function SettingsPage() {
               {children.map((child) => (
                 <div
                   key={child.id}
-                  className="flex items-center justify-between p-4 border rounded-xl bg-white hover:shadow-sm transition-all group"
+                  className="flex items-center justify-between p-4 border rounded-xl transition-all group
+                    bg-white hover:shadow-sm 
+                    dark:bg-slate-900 dark:border-slate-800 dark:hover:bg-slate-800/50"
                 >
                   <div className="flex items-center gap-4">
-                    <Avatar className="h-12 w-12 bg-slate-100 border-2 border-slate-200 text-slate-600">
+                    <Avatar className="h-12 w-12 border-2 
+                      bg-slate-100 border-slate-200 text-slate-600
+                      dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300">
                       <AvatarFallback className="text-lg font-bold">
                         {child.avatar}
                       </AvatarFallback>
@@ -327,7 +560,9 @@ export function SettingsPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"
+                    className="text-muted-foreground transition-colors
+                      hover:text-red-600 hover:bg-red-50 
+                      dark:hover:bg-red-900/20 dark:hover:text-red-400"
                     onClick={() => handleDeleteChild(child.name)}
                     title="Remove child"
                   >
@@ -340,7 +575,9 @@ export function SettingsPage() {
 
             <Button
               variant="outline"
-              className="w-full h-12 border-dashed border-2 text-slate-500 hover:border-red-500 hover:bg-red-50 hover:text-red-600 transition-all mt-2"
+              className="w-full h-12 border-dashed border-2 transition-all mt-2
+                text-slate-500 hover:border-red-500 hover:bg-red-50 hover:text-red-600
+                dark:border-slate-700 dark:text-slate-400 dark:hover:bg-red-900/10 dark:hover:text-red-400 dark:hover:border-red-500/50"
             >
               <Users className="h-5 w-5 mr-2" />
               Add New Child

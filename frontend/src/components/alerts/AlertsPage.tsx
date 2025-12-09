@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -16,7 +17,6 @@ import {
   Volume2,
   VolumeX,
   ExternalLink,
-  AlertCircle,
   Bell,
   Clock,
   Filter,
@@ -41,60 +41,18 @@ export function AlertsPage() {
   const [riskFilter, setRiskFilter] = useState("all");
   const [showAcknowledged, setShowAcknowledged] = useState(false);
 
-  const [alerts, setAlerts] = useState<Alert[]>([
-    {
-      id: 1,
-      childName: "Emma",
-      childAvatar: "E",
-      severity: "high",
-      category: "Self-Harm",
-      title: "High-risk content detected",
-      description: "Posted in r/depression about feeling hopeless",
-      timestamp: "2 hours ago",
-      url: "https://reddit.com/...",
-      acknowledged: false,
-      muted: false,
-    },
-    {
-      id: 2,
-      childName: "Emma",
-      childAvatar: "E",
-      severity: "high",
-      category: "Mental Health",
-      title: "Concerning language pattern",
-      description: "Comment contains phrases associated with anxiety",
-      timestamp: "5 hours ago",
-      url: "https://reddit.com/...",
-      acknowledged: false,
-      muted: false,
-    },
-    {
-      id: 3,
-      childName: "Lucas",
-      childAvatar: "L",
-      severity: "medium",
-      category: "Profanity",
-      title: "Inappropriate language used",
-      description: "Comment in r/gaming contains profanity",
-      timestamp: "1 day ago",
-      url: "https://reddit.com/...",
-      acknowledged: true,
-      muted: false,
-    },
-    {
-      id: 4,
-      childName: "Emma",
-      childAvatar: "E",
-      severity: "medium",
-      category: "Peer Pressure",
-      title: "Potential peer pressure detected",
-      description: "Discussion about trying something 'everyone else is doing'",
-      timestamp: "2 days ago",
-      url: "https://reddit.com/...",
-      acknowledged: true,
-      muted: false,
-    },
-  ]);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+
+  useEffect(() => {
+      const fetchAlerts = async () => {
+          const token = localStorage.getItem("token");
+          const res = await fetch("http://localhost:8000/api/alerts/", {
+              headers: { "Authorization": `Bearer ${token}` }
+          });
+          if (res.ok) setAlerts(await res.json());
+      };
+      fetchAlerts();
+  }, []);
 
   const acknowledgeAlert = (id: number) => {
     setAlerts(
@@ -133,14 +91,21 @@ export function AlertsPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-gradient-to-r from-red-50 to-white p-6 rounded-2xl border border-red-100 shadow-sm">
+      {/* --- HEADER SECTION (Đã sửa Dark Mode) --- */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 
+        p-6 rounded-2xl border shadow-sm
+        bg-gradient-to-r from-red-50 to-white border-red-100 
+        dark:from-red-950/30 dark:to-slate-950 dark:border-red-900/50"> 
+        {/* ^^^ Thêm dark:from... dark:to... dark:border... */}
+        
         <div>
-          <h1 className="text-2xl font-bold text-red-950 flex items-center gap-2">
+          <h1 className="text-2xl font-bold flex items-center gap-2 
+            text-red-950 dark:text-red-100"> {/* ^^^ Sửa màu chữ tiêu đề */}
             <Bell className="h-6 w-6 text-red-500 fill-red-500" />
             Alerts & Notifications
           </h1>
-          <p className="text-red-800/80 mt-1 text-base">
+          <p className="mt-1 text-base 
+            text-red-800/80 dark:text-red-200/70"> {/* ^^^ Sửa màu chữ mô tả */}
             {unreadCount} unread {unreadCount === 1 ? "alert" : "alerts"}{" "}
             requiring your attention.
           </p>
@@ -149,7 +114,9 @@ export function AlertsPage() {
           variant="outline"
           size="sm"
           onClick={() => setShowAcknowledged(!showAcknowledged)}
-          className="bg-white border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800 shadow-sm"
+          className="shadow-sm border-red-200 
+            bg-white text-red-700 hover:bg-red-50 hover:text-red-800 
+            dark:bg-slate-900 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-900/20"
         >
           <Filter className="h-4 w-4 mr-2" />
           {showAcknowledged ? "Hide" : "Show"} Acknowledged
@@ -160,7 +127,7 @@ export function AlertsPage() {
         <CardHeader className="px-0 pt-0">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-lg font-semibold">
+              <CardTitle className="text-lg font-semibold text-foreground"> {/* Thêm text-foreground */}
                 Recent Activity
               </CardTitle>
               <CardDescription>
@@ -171,8 +138,10 @@ export function AlertsPage() {
         </CardHeader>
 
         <CardContent className="px-0 space-y-6">
-          {/* Filters */}
-          <div className="bg-white p-4 rounded-xl border shadow-sm">
+          {/* --- FILTERS (Đã sửa Dark Mode) --- */}
+          <div className="p-4 rounded-xl border shadow-sm 
+            bg-white border-slate-200
+            dark:bg-slate-900 dark:border-slate-800">
             <FilterBar
               searchValue={searchValue}
               onSearchChange={setSearchValue}
@@ -186,14 +155,17 @@ export function AlertsPage() {
           {/* Alerts List */}
           <div className="space-y-4">
             {filteredAlerts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center bg-white rounded-2xl border border-dashed border-slate-200">
-                <div className="bg-slate-50 p-4 rounded-full mb-4">
+              /* --- EMPTY STATE (Đã sửa Dark Mode) --- */
+              <div className="flex flex-col items-center justify-center py-16 text-center rounded-2xl border border-dashed
+                bg-white border-slate-200
+                dark:bg-slate-900/50 dark:border-slate-800">
+                <div className="p-4 rounded-full mb-4 bg-slate-50 dark:bg-slate-800">
                   <Check className="h-8 w-8 text-green-500" />
                 </div>
-                <h3 className="text-lg font-semibold text-slate-900">
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                   All Caught Up!
                 </h3>
-                <p className="text-slate-500 max-w-sm mt-2">
+                <p className="max-w-sm mt-2 text-slate-500 dark:text-slate-400">
                   No new alerts to display.{" "}
                   {showAcknowledged
                     ? "Try adjusting your filters."
@@ -213,13 +185,14 @@ export function AlertsPage() {
               filteredAlerts.map((alert) => (
                 <Card
                   key={alert.id}
-                  className={`group transition-all border-l-4 hover:shadow-md
+                  /* --- ALERT CARD (Đã sửa Dark Mode) --- */
+                  className={`group transition-all border-l-4 hover:shadow-md dark:bg-slate-900
                     ${
                       alert.acknowledged
-                        ? "opacity-75 bg-slate-50 border-l-slate-300 border-y-slate-200 border-r-slate-200"
+                        ? "opacity-75 bg-slate-50 border-l-slate-300 border-y-slate-200 border-r-slate-200 dark:bg-slate-900/50 dark:border-slate-800"
                         : alert.severity === "high"
-                        ? "bg-white border-l-red-500 border-red-100"
-                        : "bg-white border-l-orange-400 border-orange-100"
+                        ? "bg-white border-l-red-500 border-red-100 dark:border-red-900 dark:border-l-red-600"
+                        : "bg-white border-l-orange-400 border-orange-100 dark:border-orange-900 dark:border-l-orange-500"
                     }
                   `}
                 >
@@ -227,24 +200,24 @@ export function AlertsPage() {
                     <div className="flex flex-col md:flex-row gap-4 md:items-center">
                       {/* User Avatar & Badges */}
                       <div className="flex items-start gap-4 min-w-[200px]">
-                        <Avatar className="h-10 w-10 border-2 border-white shadow-sm">
+                        <Avatar className="h-10 w-10 border-2 border-white shadow-sm dark:border-slate-800">
                           <AvatarFallback
                             className={`${
                               alert.severity === "high"
-                                ? "bg-red-100 text-red-700"
-                                : "bg-orange-100 text-orange-700"
+                                ? "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-200"
+                                : "bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-200"
                             }`}
                           >
                             {alert.childAvatar}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex flex-col gap-1">
-                          <span className="font-semibold text-slate-900">
+                          <span className="font-semibold text-slate-900 dark:text-slate-100">
                             {alert.childName}
                           </span>
                           <Badge
                             variant="outline"
-                            className="w-fit text-[10px] font-normal bg-slate-50"
+                            className="w-fit text-[10px] font-normal bg-slate-50 dark:bg-slate-800 dark:text-slate-300"
                           >
                             {alert.category}
                           </Badge>
@@ -254,7 +227,7 @@ export function AlertsPage() {
                       {/* Alert Content */}
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-semibold text-slate-900">
+                          <h4 className="font-semibold text-slate-900 dark:text-slate-100">
                             {alert.title}
                           </h4>
                           <RiskIndicator
@@ -266,28 +239,28 @@ export function AlertsPage() {
                           {alert.muted && (
                             <Badge
                               variant="secondary"
-                              className="text-[10px] h-5 bg-slate-100 text-slate-500"
+                              className="text-[10px] h-5 bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
                             >
                               <VolumeX className="h-3 w-3 mr-1" /> Muted
                             </Badge>
                           )}
                         </div>
-                        <p className="text-sm text-slate-600 leading-relaxed">
+                        <p className="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
                           {alert.description}
                         </p>
-                        <div className="flex items-center gap-2 mt-2 text-xs text-slate-400">
+                        <div className="flex items-center gap-2 mt-2 text-xs text-slate-400 dark:text-slate-500">
                           <Clock className="h-3 w-3" />
                           <span>{alert.timestamp}</span>
                         </div>
                       </div>
 
                       {/* Actions */}
-                      <div className="flex md:flex-col gap-2 md:pl-4 md:border-l border-slate-100">
+                      <div className="flex md:flex-col gap-2 md:pl-4 md:border-l border-slate-100 dark:border-slate-800">
                         {!alert.acknowledged && (
                           <Button
                             size="sm"
                             onClick={() => acknowledgeAlert(alert.id)}
-                            className="bg-slate-900 text-white hover:bg-slate-800 shadow-sm w-full justify-start"
+                            className="bg-slate-900 text-white hover:bg-slate-800 shadow-sm w-full justify-start dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
                           >
                             <Check className="h-3.5 w-3.5 mr-2" />
                             Acknowledge
@@ -299,7 +272,7 @@ export function AlertsPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => muteAlert(alert.id)}
-                            className="flex-1 text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+                            className="flex-1 text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800"
                             title={
                               alert.muted
                                 ? "Unmute notifications"
@@ -316,7 +289,7 @@ export function AlertsPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => window.open(alert.url, "_blank")}
-                            className="flex-1 text-slate-500 hover:text-primary hover:bg-primary/5"
+                            className="flex-1 text-slate-500 hover:text-primary hover:bg-primary/5 dark:text-slate-400 dark:hover:text-primary dark:hover:bg-primary/10"
                             title="View source"
                           >
                             <ExternalLink className="h-4 w-4" />
