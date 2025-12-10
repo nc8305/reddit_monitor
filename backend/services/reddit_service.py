@@ -54,13 +54,19 @@ def get_user_interactions(username: str, limit: int = None, since_timestamp: flo
         user = reddit.redditor(username)
         activities = []
 
-        # Giới hạn tối đa 10 item mỗi loại để tránh quá tải
-        SAFE_LIMIT = 10
-        comment_limit = min(limit, SAFE_LIMIT) if limit else SAFE_LIMIT
-        post_limit = min(limit, SAFE_LIMIT) if limit else SAFE_LIMIT
+        # Giới hạn tối đa 50 item mỗi loại để đảm bảo lấy đủ comments/posts
+        SAFE_LIMIT = 50
+        # Nếu limit=None, lấy tối đa SAFE_LIMIT để đảm bảo có đủ data
+        comment_limit = limit if limit is not None else SAFE_LIMIT
+        post_limit = limit if limit is not None else SAFE_LIMIT
+        # Giới hạn tối đa để tránh quá tải
+        comment_limit = min(comment_limit, SAFE_LIMIT)
+        post_limit = min(post_limit, SAFE_LIMIT)
 
         # 1. Lấy Comments
+        comment_count = 0
         try:
+            print(f"   [DEBUG] Đang lấy comments cho {username}, limit={comment_limit}")
             for comment in user.comments.new(limit=comment_limit):
                 if since_timestamp and comment.created_utc <= since_timestamp:
                     break
@@ -68,7 +74,9 @@ def get_user_interactions(username: str, limit: int = None, since_timestamp: flo
                 sentiment = "Neutral"
                 
                 # Normalize text
-                if not comment.body: continue
+                if not comment.body: 
+                    continue
+                comment_count += 1
                 text_lower = comment.body.lower()
                 text_normalized = re.sub(r'\s+', ' ', text_lower)
                 
@@ -108,8 +116,11 @@ def get_user_interactions(username: str, limit: int = None, since_timestamp: flo
                     "risk": risk_level,
                     "url": f"https://reddit.com{comment.permalink}"
                 })
+            print(f"   [DEBUG] Đã lấy {comment_count} comments cho {username}")
         except Exception as e:
             print(f"--> [WARN] Lỗi lấy comment ({username}): {e}")
+            import traceback
+            traceback.print_exc()  # In chi tiết lỗi để debug
 
         # 2. Lấy Posts
         try:

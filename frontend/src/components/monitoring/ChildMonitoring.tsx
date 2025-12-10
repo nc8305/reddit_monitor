@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import {
   Card,
@@ -162,9 +162,18 @@ export function ChildMonitoring() {
           const currentExists = data.find(
             (c: Child) => c.id.toString() === selectedChildId
           );
-          if (!selectedChildId || !currentExists) {
+          // Chỉ set selectedChildId về child đầu tiên nếu:
+          // 1. Chưa có selectedChildId nào (lần đầu load)
+          // 2. Child hiện tại không còn tồn tại trong danh sách
+          // KHÔNG set nếu user đã chọn một child khác
+          if (!selectedChildId) {
+            // Lần đầu load - set về child đầu tiên
+            setSelectedChildId(data[0].id.toString());
+          } else if (!currentExists) {
+            // Child hiện tại không còn tồn tại - set về child đầu tiên
             setSelectedChildId(data[0].id.toString());
           }
+          // Nếu currentExists = true, giữ nguyên selectedChildId hiện tại
         } else {
           setSelectedChildId("");
           setDisplayedInteractions([]);
@@ -323,6 +332,29 @@ export function ChildMonitoring() {
     return () => clearInterval(intervalId);
   }, []);
 
+  // Track previous child ID to detect user-initiated changes
+  const prevSelectedChildIdRef = useRef<string>("");
+
+  // Trigger scan when child is selected (only for user-initiated changes)
+  const triggerScanForChild = async (childId: string) => {
+    if (!childId) return;
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(
+        `http://localhost:8000/api/children/${childId}/scan`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      if (response.ok) {
+        console.log(`[Scan] Triggered scan for child ${childId}`);
+      }
+    } catch (error) {
+      console.error("[Scan] Error triggering scan:", error);
+    }
+  };
+
   // Reset data when child changes
   useEffect(() => {
     // Clean up và reset data khi chuyển child
@@ -331,6 +363,25 @@ export function ChildMonitoring() {
     setIsStreaming(false);
     setIsFetchingInteractions(false);
     setLastActivityTime(null);
+  }, [selectedChildId]);
+
+  // Separate effect to trigger scan only when user manually selects a child
+  useEffect(() => {
+    // Chỉ trigger scan khi:
+    // 1. selectedChildId có giá trị (không phải empty)
+    // 2. prevSelectedChildIdRef đã có giá trị trước đó (không phải lần đầu)
+    // 3. selectedChildId khác với giá trị trước đó (user đã chọn child khác)
+    if (
+      selectedChildId && 
+      prevSelectedChildIdRef.current && 
+      prevSelectedChildIdRef.current !== selectedChildId
+    ) {
+      console.log(`[Scan] User selected child ${selectedChildId} (from ${prevSelectedChildIdRef.current}), triggering scan...`);
+      triggerScanForChild(selectedChildId);
+    }
+    
+    // Update ref với giá trị mới (sau khi check)
+    prevSelectedChildIdRef.current = selectedChildId;
   }, [selectedChildId]);
 
   // Streaming effect - chỉ chạy khi có rawInteractions mới
