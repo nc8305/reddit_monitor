@@ -22,7 +22,7 @@ reddit = praw.Reddit(
     user_agent=env_settings.REDDIT_USER_AGENT,
     requestor_kwargs={
         'session': session,
-        'timeout': 10        # <--- QUAN TRỌNG: Giảm từ 60s xuống 10s để tránh treo Worker
+        'timeout': 30        # <--- QUAN TRỌNG: Giảm từ 60s xuống 10s để tránh treo Worker
     }
 )
 
